@@ -98,6 +98,7 @@ struct RootView: View {
 
                 TipCardView()
                 CoachOverlay(frames: anchorFrames)
+                    .ignoresSafeArea()
 
                 // Snapshot toast (saved / permission denied) — non-blocking.
                 if let toast = app.toast {
@@ -135,6 +136,7 @@ struct RootView: View {
 
                 KeyCommandBridge().frame(width: 0, height: 0)
             }
+            .coordinateSpace(name: "moshRoot")
         }
         .onPreferenceChange(CoachFrameKey.self) { anchorFrames = $0 }
         .preferredColorScheme(.dark)

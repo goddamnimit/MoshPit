@@ -72,11 +72,11 @@ struct CoachFrameKey: PreferenceKey {
 }
 
 extension View {
-    /// Tags a view as a coach-mark anchor; its global frame is published.
+    /// Tags a view as a coach-mark anchor; its frame in moshRoot space is published.
     func coachAnchor(_ anchor: CoachAnchor) -> some View {
         overlay(GeometryReader { geo in
             Color.clear.preference(key: CoachFrameKey.self,
-                                   value: [anchor: geo.frame(in: .global)])
+                                   value: [anchor: geo.frame(in: .named("moshRoot"))])
         })
     }
 }
@@ -90,6 +90,8 @@ struct CoachOverlay: View {
     @EnvironmentObject var app: AppModel
     let frames: [CoachAnchor: CGRect]
 
+    @State private var lastTarget: CGRect? = nil
+
     var body: some View {
         if let index = app.coachIndex, index < CoachScript.stops.count {
             let stop = CoachScript.stops[index]
@@ -99,7 +101,7 @@ struct CoachOverlay: View {
                         Color.black.opacity(0.7).ignoresSafeArea()
                         finaleCard
                     } else {
-                        let target = spotlightRect(for: stop, in: geo)
+                        let target = app.isTutorialTransitioning ? (lastTarget ?? spotlightRect(for: stop, in: geo)) : spotlightRect(for: stop, in: geo)
                         // Dim + spotlight are purely visual: hit-testing off,
                         // so the render loop / session UI beneath is never
                         // blocked by the overlay.
@@ -115,6 +117,11 @@ struct CoachOverlay: View {
                             .animation(.spring(duration: 0.45), value: target)
                             .allowsHitTesting(false)
                         callout(for: stop, target: target, in: geo)
+                            .onChange(of: target) { _, newTarget in
+                                if !app.isTutorialTransitioning {
+                                    lastTarget = newTarget
+                                }
+                            }
                     }
                     // Skip is always visible in the corner.
                     if stop.anchor != .finale {
@@ -134,7 +141,12 @@ struct CoachOverlay: View {
                     }
                 }
             }
-            // Anchor frames are published in .global (screen) coordinates.
+            .onChange(of: app.coachIndex) { _, newIndex in
+                if newIndex == nil || newIndex == 0 {
+                    lastTarget = nil
+                }
+            }
+            // Anchor frames are published in moshRoot coordinates.
             // The overlay must live in the SAME space: without ignoresSafeArea
             // its GeometryReader starts below the notch, and .position()
             // (which is LOCAL) would draw every ring shifted by the safe-area
@@ -154,11 +166,11 @@ struct CoachOverlay: View {
         let raw = frames[stop.anchor] ?? CGRect(x: geo.size.width / 2 - 40,
                                                 y: geo.size.height / 2 - 40,
                                                 width: 80, height: 80)
-        // Global -> overlay-local. With ignoresSafeArea the overlay's origin
+        // moshRoot -> overlay-local. With ignoresSafeArea the overlay's origin
         // is (0,0) and this is the identity, but converting explicitly keeps
         // the ring glued to its target even if the overlay is ever re-hosted.
-        let origin = geo.frame(in: .global).origin
-        return raw.offsetBy(dx: -origin.x, dy: -origin.y)
+        let localFrame = geo.frame(in: .named("moshRoot"))
+        return raw.offsetBy(dx: -localFrame.origin.x, dy: -localFrame.origin.y)
             .insetBy(dx: -Theme.g1, dy: -Theme.g1)   // 8pt padding
     }
 

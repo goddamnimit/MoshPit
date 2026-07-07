@@ -34,6 +34,8 @@ final class AppModel: ObservableObject {
     @Published var showCheatSheet = false
     /// Coach-mark tutorial: index into CoachScript.stops, nil = off.
     @Published var coachIndex: Int? = nil
+    /// True when the tutorial is waiting for a drawer to animate open/close before positioning the spotlight.
+    @Published var isTutorialTransitioning = false
     /// Floating dismissible tip card (guided demos).
     @Published var activeTip: String? = nil
     /// ParamRow to highlight (guided demos); cleared on interaction.
@@ -417,6 +419,7 @@ final class AppModel: ObservableObject {
     // MARK: Tutorial
 
     func startTutorial() {
+        isTutorialTransitioning = false
         openDrawer = CoachScript.stops[0].drawer
         withAnimation(Theme.fade) { coachIndex = 0 }
     }
@@ -427,6 +430,7 @@ final class AppModel: ObservableObject {
         guard next < CoachScript.stops.count else { finishTutorial(); return }
         // Open/close drawers so each stop's target is actually on screen.
         if openDrawer != CoachScript.stops[next].drawer {
+            isTutorialTransitioning = true
             openDrawer = CoachScript.stops[next].drawer
             // Let the drawer's 0.3s spring settle (plus a beat for the final
             // layout pass) BEFORE spotlighting: a frame read mid-slide pins
@@ -436,6 +440,7 @@ final class AppModel: ObservableObject {
             // preference update of newly appearing drawer content.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
                 guard let self, self.coachIndex == index else { return }   // skipped?
+                self.isTutorialTransitioning = false
                 withAnimation(Theme.fade) { self.coachIndex = next }
             }
         } else {
@@ -448,6 +453,7 @@ final class AppModel: ObservableObject {
     func finishTutorial() {
         UserDefaults.standard.set(true, forKey: CoachScript.hasSeenKey)
         openDrawer = nil
+        isTutorialTransitioning = false
         withAnimation(Theme.fade) { coachIndex = nil }
     }
 
