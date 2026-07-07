@@ -1,0 +1,23 @@
+{
+  "/Users/nimit/Documents/Xcode/MoshPit/MoshPit/App/RootView.swift" : {
+    "const-values" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/RootView.swiftconstvalues",
+    "dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/RootView.d",
+    "diagnostics" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/RootView.dia",
+    "object" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/RootView.o",
+    "swift-dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/RootView.swiftdeps"
+  },
+  "/Users/nimit/Documents/Xcode/MoshPit/MoshPit/App/Theme.swift" : {
+    "const-values" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Theme.swiftconstvalues",
+    "dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Theme.d",
+    "diagnostics" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Theme.dia",
+    "object" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Theme.o",
+    "swift-dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Theme.swiftdeps"
+  },
+  "/Users/nimit/Documents/Xcode/MoshPit/MoshPit/App/Tutorial.swift" : {
+    "const-values" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Tutorial.swiftconstvalues",
+    "dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Tutorial.d",
+    "diagnostics" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Tutorial.dia",
+    "object" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Tutorial.o",
+    "swift-dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Tutorial.swiftdeps"
+  }
+}

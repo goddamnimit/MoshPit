@@ -1,0 +1,4 @@
+module NDI {
+    header "include/Processing.NDI.Lib.h"
+    export *
+}

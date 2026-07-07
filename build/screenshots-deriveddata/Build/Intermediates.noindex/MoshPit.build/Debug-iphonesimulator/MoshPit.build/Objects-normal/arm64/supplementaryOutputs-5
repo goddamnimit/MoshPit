@@ -1,0 +1,23 @@
+{
+  "/Users/nimit/Documents/Xcode/MoshPit/MoshPit/Engine/MoshEngine.swift" : {
+    "const-values" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MoshEngine.swiftconstvalues",
+    "dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MoshEngine.d",
+    "diagnostics" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MoshEngine.dia",
+    "object" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MoshEngine.o",
+    "swift-dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MoshEngine.swiftdeps"
+  },
+  "/Users/nimit/Documents/Xcode/MoshPit/MoshPit/Engine/MotionEstimator.swift" : {
+    "const-values" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MotionEstimator.swiftconstvalues",
+    "dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MotionEstimator.d",
+    "diagnostics" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MotionEstimator.dia",
+    "object" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MotionEstimator.o",
+    "swift-dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/MotionEstimator.swiftdeps"
+  },
+  "/Users/nimit/Documents/Xcode/MoshPit/MoshPit/Engine/Renderer.swift" : {
+    "const-values" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Renderer.swiftconstvalues",
+    "dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Renderer.d",
+    "diagnostics" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Renderer.dia",
+    "object" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Renderer.o",
+    "swift-dependencies" : "/Users/nimit/Documents/Xcode/MoshPit/build/screenshots-deriveddata/Build/Intermediates.noindex/MoshPit.build/Debug-iphonesimulator/MoshPit.build/Objects-normal/arm64/Renderer.swiftdeps"
+  }
+}
