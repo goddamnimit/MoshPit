@@ -313,7 +313,10 @@ final class SmokeTests: XCTestCase {
 
         let start = Date()
         var sdrFrame: MTLTexture? = nil
-        while Date().timeIntervalSince(start) < 3.0 {
+        // 10s (was 3s): simulator software H.264 decode startup is slower and
+        // less predictable than on-device hardware decode — 3s flaked ~2/3 of
+        // runs even on an idle system, unrelated to product behavior.
+        while Date().timeIntervalSince(start) < 10.0 {
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
             if let tex = sdrSource.latestTexture {
                 sdrFrame = tex
@@ -323,7 +326,7 @@ final class SmokeTests: XCTestCase {
         sdrSource.stop()
 
         guard let sdrTex = sdrFrame else {
-            XCTFail("SDR H.264 frame did not arrive within 3 seconds")
+            XCTFail("SDR H.264 frame did not arrive within 10 seconds")
             return
         }
         XCTAssertEqual(sdrTex.width, 640)
