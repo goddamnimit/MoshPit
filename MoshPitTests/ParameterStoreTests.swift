@@ -64,4 +64,12 @@ final class ParameterStoreTests: XCTestCase {
         }
         wait(for: [exp], timeout: 2)
     }
+
+    func testParamRowFractionClamping() {
+        XCTAssertEqual(ParamRow.fraction(normalizedValue: 0.0), 0.0)
+        XCTAssertEqual(ParamRow.fraction(normalizedValue: 0.5), 0.5)
+        XCTAssertEqual(ParamRow.fraction(normalizedValue: 1.0), 1.0)
+        XCTAssertEqual(ParamRow.fraction(normalizedValue: -0.5), 0.0)
+        XCTAssertEqual(ParamRow.fraction(normalizedValue: 1.5), 1.0)
+    }
 }

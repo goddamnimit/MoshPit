@@ -836,16 +836,27 @@ struct ParamRow: View {
 
     private var isDragging: Bool { dragStartValue != nil || demoDrag }
 
+    static func fraction(normalizedValue: Float) -> CGFloat {
+        return CGFloat(min(max(normalizedValue, 0), 1))
+    }
+
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
-            let fraction = CGFloat(app.params.getNormalized(id))
+            let fraction = ParamRow.fraction(normalizedValue: app.params.getNormalized(id))
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
                     .fill(Theme.scrimBase.opacity(0.4))
                 RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
                     .fill(Theme.accent.opacity(isDragging ? 0.45 : 0.28))
-                    .frame(width: max(Theme.g1, fraction * w))
+                    .frame(width: w)
+                    .mask(
+                        HStack {
+                            Rectangle()
+                                .frame(width: max(Theme.g1, fraction * w))
+                            Spacer(minLength: 0)
+                        }
+                    )
                 HStack(spacing: Theme.g1) {
                     Text(label)
                         .font(Theme.label)
