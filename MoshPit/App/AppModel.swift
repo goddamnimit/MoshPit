@@ -3,7 +3,6 @@ import UIKit
 import Combine
 import AVFoundation
 import CoreMedia
-import os.lock
 
 enum DrawerSide { case left, right }
 
@@ -56,20 +55,8 @@ final class AppModel: ObservableObject {
     /// Format/resolution for the NEXT recording (persisted; deliberately NOT
     /// in ParameterStore — see RecordingSettings).
     let recordingSettings = RecordingSettings()
-    /// 9:16 social re-encode engine (Pro), driven from the gallery.
+    /// 9:16 social re-encode engine, driven from the gallery.
     let socialExporter = SocialExporter()
-    /// Upgrade sheet (freemium). Presented ONLY via presentUpgrade(for:),
-    /// which respects the overlay mutual-exclusivity system.
-    @Published var showUpgradeSheet = false
-    /// The capability whose gate the user hit — the sheet highlights its row.
-    private(set) var upgradeCapability: Capability?
-    /// Completes the originally-tapped action when isPro flips true while
-    /// the upgrade sheet is up (e.g. switch to the mode they tapped).
-    private var pendingProAction: (() -> Void)?
-
-    /// Thread-safe mirror of ProManager.isPro, readable from the render/MIDI
-    /// threads inside the ParameterStore write gate.
-    private let proFlag = ProFlag()
 
     enum Panel: String, Identifiable, CaseIterable {
         case sources = "Sources", effects = "Effects", threeD = "3D",
@@ -119,8 +106,6 @@ final class AppModel: ObservableObject {
 
         guard let ctx else {
             sources = nil; renderer = nil; recorder = nil; mjpeg = nil; ndi = nil
-            installWriteGate()
-            MainActor.assumeIsolated { bindProManager() }
             return
         }
         let sources = SourceManager(device: ctx.device)
@@ -209,140 +194,23 @@ final class AppModel: ObservableObject {
                 .sink { [weak self] in self?.objectWillChange.send() }
                 .store(in: &cancellables)
         }
-
-        installWriteGate()
-        // AppModel is always created on main (@StateObject / tests on main).
-        MainActor.assumeIsolated { bindProManager() }
     }
 
-    // MARK: Freemium (Pro gating)
-
-    /// Freemium gate: ONE choke point for every parameter write (touch,
-    /// keyboard, MIDI, mod matrix, automation). Rejected UI/keyboard writes
-    /// surface the upgrade sheet; other origins silently no-op.
-    private func installWriteGate() {
-        params.writeGate = { [weak self] id, value, origin in
-            guard let self else { return true }
-            let capability: Capability? = id == .mode
-                ? MoshMode(rawValue: Int(value))?.requiredCapability
-                : id.requiredCapability
-            guard let capability, !self.proFlag.value else { return true }
-            if origin == .ui || origin == .keyboard {
-                DispatchQueue.main.async {
-                    let completion: (() -> Void)? = id == .mode
-                        ? { [weak self] in self?.params.set(id, value, origin: .system) }
-                        : nil
-                    self.presentUpgrade(for: capability, andThen: completion)
-                }
-            }
-            return false
-        }
-    }
-
-    /// Mirror ProManager.isPro into the thread-safe flag and react to flips:
-    /// false -> degrade gracefully; true -> dismiss the sheet and complete
-    /// the originally-tapped action.
-    @MainActor private func bindProManager() {
-        proFlag.value = ProManager.shared.isPro   // seed synchronously
-        ProManager.shared.$isPro
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isPro in
-                guard let self else { return }
-                let was = self.proFlag.value
-                self.proFlag.value = isPro
-                if isPro {
-                    if self.showUpgradeSheet { self.showUpgradeSheet = false }
-                    self.pendingProAction?()
-                    self.pendingProAction = nil
-                } else if was {
-                    // Pro -> free (refund/revocation): snap Pro state away.
-                    self.enforceFreeTierState()
-                }
-            }
-            .store(in: &cancellables)
-    }
-
-    /// Single UI gate for actions that aren't parameter writes (source slots,
-    /// output toggles, automation, reverse). Runs `action` when allowed,
-    /// otherwise presents the upgrade sheet and completes the action on
-    /// purchase.
-    func requirePro(_ capability: Capability, then action: @escaping () -> Void) {
-        if proFlag.value { action() }
-        else { presentUpgrade(for: capability, andThen: action) }
-    }
-
-    /// Read-only entitlement flag for lock badges / disabled rows. Actions
-    /// still go through requirePro so the upgrade sheet flow stays uniform.
-    var isPro: Bool { proFlag.value }
-
-    /// Present the upgrade sheet through the same overlay-exclusivity rules
-    /// as openSheet(): drawers/sheets animate away first. Never re-presents
-    /// over itself (a rejected drag emits many writes — one sheet).
-    func presentUpgrade(for capability: Capability, andThen action: (() -> Void)? = nil) {
-        upgradeCapability = capability
-        pendingProAction = action
-        guard !showUpgradeSheet else { return }
-        showCheatSheet = false
-        showDemoSheet = false
-        let wait = openDrawer != nil || activePanel != nil
-        openDrawer = nil
-        activePanel = nil
-        if wait {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.overlaySwap) {
-                [weak self] in self?.showUpgradeSheet = true
-            }
-        } else {
-            showUpgradeSheet = true
-        }
-    }
-
-    /// Degrade gracefully when Pro state exists without the entitlement
-    /// (refund, revocation): snap the mode back to a free one, detach slots
-    /// B/MOD, stop network outputs, and reset every gated param to default.
-    /// Idempotent; called whenever isPro flips false.
-    func enforceFreeTierState() {
-        if params.mode.requiredCapability != nil {
-            params.set(.mode, Float(MoshMode.bloom.rawValue), origin: .system)
-        }
-        sources?.clear(slot: .b)
-        sources?.clear(slot: .mod)
-        for slot in SourceSlot.allCases { sources?.setReversed(false, slot: slot) }
-        if ndi?.isSending == true { ndi?.stop() }
-        if mjpeg?.isRunning == true { mjpeg?.stop() }
-        for id in ParameterID.allCases where id.requiredCapability != nil {
-            if params.get(id) != id.defaultValue {
-                params.set(id, id.defaultValue, origin: .system)
-            }
-        }
-        recordingSettings.enforceFreeTier(isPro: proFlag.value)   // ProRes/4K are Pro-only
-    }
-
-    /// Output toggles are gated HERE (the toggle-on action), never inside
-    /// NDISender/MJPEGServer.
+    /// Output toggle: enable/disable the MJPEG server.
     func setMJPEGRunning(_ on: Bool) {
         guard let mjpeg else { return }
-        if on { requirePro(.mjpegOutput) { mjpeg.start() } }
-        else { mjpeg.stop() }
+        if on { mjpeg.start() } else { mjpeg.stop() }
     }
 
     func toggleNDI() {
-        guard let ndi, renderer != nil else { return }
+        guard let ndi, let renderer else { return }
         if ndi.isSending {
             ndi.stop()
         } else {
-            requirePro(.ndiOutput) { [weak self] in
-                guard let self, let r = self.renderer else { return }
-                ndi.start(name: "MoshPit", width: r.engine.canvasWidth,
-                          height: r.engine.canvasHeight)
-            }
+            ndi.start(name: "MoshPit", width: renderer.engine.canvasWidth,
+                      height: renderer.engine.canvasHeight)
         }
     }
-
-    #if DEBUG
-    /// Unit-test hook: force the gate flag without StoreKit (the shared
-    /// ProManager defaults to Pro under XCTest).
-    func debugSetPro(_ isPro: Bool) { proFlag.value = isPro }
-    #endif
 
     var effectOrder: [EffectID] {
         get { renderer?.effects.order ?? EffectID.allCases }
@@ -419,9 +287,7 @@ final class AppModel: ObservableObject {
 
     /// Shift+R: reverse playback on the first file-video slot (A wins).
     func toggleReverse() {
-        requirePro(.reversePlayback) { [weak self] in
-            self?.sources?.toggleReverseOnActiveSlot()
-        }
+        sources?.toggleReverseOnActiveSlot()
     }
 
     /// M: cycle None -> Horizontal -> Vertical -> Quad -> None.
@@ -450,10 +316,7 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(Theme.fade) { self.snapshotFlash = false }
         }
-        // Watermark (free tier): checked ONCE at the trigger and latched for
-        // this artifact.
-        let watermark = !proFlag.value
-        renderer.requestSnapshot(watermark: watermark) { [weak self] texture in
+        renderer.requestSnapshot { [weak self] texture in
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let texture, let image = SnapshotSaver.image(from: texture) else {
                     DispatchQueue.main.async { self?.showToast("Snapshot failed") }
@@ -598,12 +461,6 @@ final class AppModel: ObservableObject {
         guard let recorder, let renderer else { return }
         if recorder.isRecording { recorder.stop() }
         else {
-            // SECOND gate (see RecordingSettings.enforceFreeTier doc): the UI
-            // already blocks picking ProRes/4K without Pro, but a persisted
-            // UserDefaults value is never trusted on its own — re-validate
-            // against the live entitlement right before it reaches the
-            // writer, every time, not just after a refund.
-            recordingSettings.enforceFreeTier(isPro: proFlag.value)
             var w = renderer.engine.canvasWidth, h = renderer.engine.canvasHeight
             if let longEdge = recordingSettings.resolution.longEdge {
                 // Export resolution sets the LONG edge; short edge derives
@@ -618,11 +475,7 @@ final class AppModel: ObservableObject {
                 if long > cap, long > 0 { w = w * cap / long; h = h * cap / long }
                 (w, h) = (max(2, w & ~1), max(2, h & ~1))
             }
-            // Watermark (free tier): checked ONCE at recording start and
-            // latched — a purchase mid-recording finishes with its starting
-            // state.
             recorder.start(width: w, height: h,
-                           watermark: !proFlag.value,
                            codec: recordingSettings.format.codecType)
         }
     }
@@ -637,15 +490,4 @@ struct ShareToast: Equatable, Identifiable {
     let id = UUID()
     let message: String
     let shareURL: URL?
-}
-
-/// Tiny lock-protected Bool: written on main when the entitlement changes,
-/// read from the render/MIDI threads inside the ParameterStore write gate.
-final class ProFlag {
-    private var lock = os_unfair_lock_s()
-    private var stored = false
-    var value: Bool {
-        get { os_unfair_lock_lock(&lock); defer { os_unfair_lock_unlock(&lock) }; return stored }
-        set { os_unfair_lock_lock(&lock); stored = newValue; os_unfair_lock_unlock(&lock) }
-    }
 }

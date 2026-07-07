@@ -66,15 +66,7 @@ struct SourcesPanel: View {
                     if app.sources?.isReversible(slot: slot) == true {
                         Toggle("Reverse playback", isOn: Binding(
                             get: { app.sources?.reversed[slot] ?? false },
-                            set: { on in
-                                if on {
-                                    app.requirePro(.reversePlayback) {
-                                        app.sources?.setReversed(true, slot: slot)
-                                    }
-                                } else {
-                                    app.sources?.setReversed(false, slot: slot)
-                                }
-                            }))
+                            set: { on in app.sources?.setReversed(on, slot: slot) }))
                     }
                     sourceButtonGrid(slot: slot)
                 } header: {
@@ -119,7 +111,7 @@ struct SourcesPanel: View {
                         return
                     }
                     validationError = nil
-                    gated(urlFor) { app.sources?.setURL(url, slot: urlFor, name: url.host()) }
+                    app.sources?.setURL(url, slot: urlFor, name: url.host())
                 }
                 Text("DRM/FairPlay streams won't yield pixel buffers and can't be moshed.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
@@ -151,16 +143,6 @@ struct SourcesPanel: View {
         }
     }
 
-    /// The ONE choke point for attaching sources: slots B and MOD are
-    /// Pro-gated; slot A (and Clear) never ask.
-    private func gated(_ slot: SourceSlot, _ action: @escaping () -> Void) {
-        if let capability = slot.requiredCapability {
-            app.requirePro(capability, then: action)
-        } else {
-            action()
-        }
-    }
-
     /// Uniform 4-up source picker: identical widths, icon over caption,
     /// accent fill on the currently active choice. Same grid for A/B/MOD.
     private func sourceButtonGrid(slot: SourceSlot) -> some View {
@@ -169,15 +151,15 @@ struct SourcesPanel: View {
             // ("camera.front" isn't a real SF Symbol — viewfinder reads as selfie.)
             SlotSourceButton(icon: "person.fill.viewfinder", label: "Front",
                              selected: name == "Front Camera") {
-                gated(slot) { app.sources?.setCamera(.front, slot: slot) }
+                app.sources?.setCamera(.front, slot: slot)
             }
             SlotSourceButton(icon: "camera", label: "Rear",
                              selected: name == "Back Camera") {
-                gated(slot) { app.sources?.setCamera(.back, slot: slot) }
+                app.sources?.setCamera(.back, slot: slot)
             }
             SlotSourceButton(icon: "photo.on.rectangle.fill", label: "Video",
                              selected: app.sources?.isReversible(slot: slot) == true) {
-                gated(slot) { pickingFor = slot }
+                pickingFor = slot
             }
             SlotSourceButton(icon: "xmark.circle.fill", label: "Clear",
                              selected: false) {
@@ -486,10 +468,8 @@ struct ControlPanel: View {
                     Text(String(format: "%+.2f", newAmount)).font(Theme.monoSmall).monospacedDigit()
                 }
                 Button("Add route") {
-                    app.requirePro(.modMatrix) {
-                        app.modMatrix.routes.append(
-                            ModRoute(source: newSource, destination: newDest, amount: newAmount))
-                    }
+                    app.modMatrix.routes.append(
+                        ModRoute(source: newSource, destination: newDest, amount: newAmount))
                 }
             }
     }
@@ -507,7 +487,7 @@ struct AutomationPanel: View {
             Section {
                 Button(app.automation.isRecording ? "■ Stop recording take" : "● Record automation take") {
                     if app.automation.isRecording { _ = app.automation.stopRecording() }
-                    else { app.requirePro(.automation) { app.automation.startRecording() } }
+                    else { app.automation.startRecording() }
                 }
                 .tint(app.automation.isRecording ? Theme.accent : Theme.textPrimary)
                 Toggle("Loop playback", isOn: Binding(
@@ -526,7 +506,7 @@ struct AutomationPanel: View {
                                 .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
                         }
                         Spacer()
-                        Button("▶") { app.requirePro(.automation) { app.automation.play(s) } }
+                        Button("▶") { app.automation.play(s) }
                         Button { renaming = s; newName = s.name } label: {
                             Image(systemName: "pencil")
                         }
@@ -666,7 +646,6 @@ struct OutputPanel: View {
                 Text("NDI runs at canvas resolution, capped by this. Recording uses it only when Export resolution is Match Canvas.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
-            ProStatusSection()
         }
     }
 }
@@ -675,8 +654,7 @@ struct OutputPanel: View {
 
 /// Format + resolution for the NEXT recording. These live in
 /// RecordingSettings (persisted via UserDefaults) — NOT ParameterStore; see
-/// the RecordingSettings doc comment for why. ProRes 4444 and 4K are
-/// Pro-only: locked rows show a Pro badge and route through requirePro.
+/// the RecordingSettings doc comment for why.
 private struct ExportSettingsSection: View {
     @EnvironmentObject var app: AppModel
     @ObservedObject var settings: RecordingSettings
@@ -685,25 +663,15 @@ private struct ExportSettingsSection: View {
         Section("Export — applies to next recording") {
             ForEach(RecordingSettings.Format.allCases) { format in
                 optionRow(title: format.rawValue,
-                          selected: settings.format == format,
-                          locked: format.requiredCapability != nil && !app.isPro) {
-                    if let capability = format.requiredCapability {
-                        app.requirePro(capability) { settings.format = format }
-                    } else {
-                        settings.format = format
-                    }
+                          selected: settings.format == format) {
+                    settings.format = format
                 }
             }
             Divider()
             ForEach(RecordingSettings.Resolution.allCases) { res in
                 optionRow(title: res.rawValue,
-                          selected: settings.resolution == res,
-                          locked: res.requiredCapability != nil && !app.isPro) {
-                    if let capability = res.requiredCapability {
-                        app.requirePro(capability) { settings.resolution = res }
-                    } else {
-                        settings.resolution = res
-                    }
+                          selected: settings.resolution == res) {
+                    settings.resolution = res
                 }
             }
             Text("Resolution sets the recording's long edge; the short edge follows the canvas aspect.")
@@ -711,39 +679,21 @@ private struct ExportSettingsSection: View {
         }
     }
 
-    private func optionRow(title: String, selected: Bool, locked: Bool,
+    private func optionRow(title: String, selected: Bool,
                            action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
                 Text(title)
                     .font(Theme.label)
                     .foregroundStyle(Theme.textPrimary)
-                    .opacity(locked ? Theme.disabledOpacity : 1)
                 Spacer()
-                if locked {
-                    ProBadge()
-                } else if selected {
+                if selected {
                     Image(systemName: "checkmark")
                         .font(Theme.labelSmall)
                         .foregroundStyle(Theme.accent)
                 }
             }
         }
-    }
-}
-
-/// Small "PRO" lock badge for gated rows.
-struct ProBadge: View {
-    var body: some View {
-        HStack(spacing: Theme.gHalf) {
-            Image(systemName: "lock.fill")
-            Text("PRO")
-        }
-        .font(Theme.labelSmall)
-        .foregroundStyle(Theme.accent)
-        .padding(.horizontal, Theme.g1)
-        .padding(.vertical, Theme.gHalf)
-        .overlay(Capsule().stroke(Theme.accent, lineWidth: 1))
     }
 }
 
@@ -781,43 +731,6 @@ private struct CopyMJPEGURLButton: View {
         if !canCopy {
             Text("Start MJPEG server first.")
                 .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
-        }
-    }
-}
-
-/// Bottom of the Output sheet: quiet Pro status when unlocked, otherwise a
-/// Restore Purchases row that reflects purchaseState inline.
-private struct ProStatusSection: View {
-    @ObservedObject var pro = ProManager.shared
-
-    var body: some View {
-        Section("MoshPit Pro") {
-            if pro.isPro {
-                Text("MoshPit Pro ✓")
-                    .font(Theme.label)
-                    .foregroundStyle(Theme.accent)
-            } else {
-                Button {
-                    Task { await pro.restore() }
-                } label: {
-                    HStack {
-                        Text("Restore Purchases").font(Theme.label)
-                        Spacer()
-                        if pro.purchaseState == .restoring {
-                            ProgressView().tint(Theme.textSecondary)
-                        }
-                    }
-                }
-                .disabled(pro.purchaseState == .restoring)
-                switch pro.purchaseState {
-                case .failed(let message):
-                    Text(message).font(Theme.labelSmall).foregroundStyle(Theme.accent)
-                case .info(let message):
-                    Text(message).font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
-                default:
-                    EmptyView()
-                }
-            }
         }
     }
 }

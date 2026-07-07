@@ -50,22 +50,16 @@ final class MoshRecorder: NSObject, ObservableObject,
     private var audioSession: AVCaptureSession?
     private let audioQueue = DispatchQueue(label: "moshpit.rec.audio")
     private var texCache: CVMetalTextureCache?
-    private let watermarkCompositor: WatermarkCompositor
-    /// Latched at start() for the whole artifact — a purchase mid-recording
-    /// does NOT drop the watermark; the recording keeps its starting state.
-    private(set) var watermarkLatched = false
 
     init(ctx: MetalContext) {
         self.ctx = ctx
-        watermarkCompositor = WatermarkCompositor(ctx: ctx)
         super.init()
         CVMetalTextureCacheCreate(nil, nil, ctx.device, nil, &texCache)
     }
 
-    func start(width: Int, height: Int, watermark: Bool = false,
+    func start(width: Int, height: Int,
                codec codecType: AVVideoCodecType? = nil) {
         guard !isRecording else { return }
-        watermarkLatched = watermark
         lastError = nil
         let url = SessionClipStore.recordingURL()
         do {
@@ -169,12 +163,13 @@ final class MoshRecorder: NSObject, ObservableObject,
             nil, cache, pixelBuffer, nil, .bgra8Unorm,
             CVPixelBufferGetWidth(pixelBuffer), CVPixelBufferGetHeight(pixelBuffer), 0, &cvTex)
         guard let dst = cvTex.flatMap(CVMetalTextureGetTexture) else { return }
-        // Single watermark choke point (shared with snapshots): composited
-        // post-Finisher, on the BGRA output texture, immediately before
-        // pixel-buffer append. Canvas and texture-cache discipline untouched.
-        watermarkCompositor.encodeBlit(from: texture, to: dst,
-                                       watermark: watermarkLatched,
-                                       commandBuffer: cb)
+        if let enc = cb.makeComputeCommandEncoder() {
+            enc.label = "output.blit"
+            enc.setTexture(texture, index: 0)
+            enc.setTexture(dst, index: 1)
+            ctx.dispatch(enc, "blitScale", width: dst.width, height: dst.height)
+            enc.endEncoding()
+        }
         cb.addCompletedHandler { [weak self] _ in
             guard let self, self.isRecording else { return }
             _ = adaptor.append(pixelBuffer, withPresentationTime: time)

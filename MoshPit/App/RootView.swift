@@ -146,11 +146,6 @@ struct RootView: View {
                 .presentationBackground(.ultraThinMaterial)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
-        .sheet(isPresented: $app.showUpgradeSheet) {
-            UpgradeSheet()
-                .presentationDetents([.large])
-                .presentationBackground(.ultraThinMaterial)
-        }
         .fullScreenCover(item: $app.playbackClip) { clip in
             ClipPlaybackView(clip: clip)
         }

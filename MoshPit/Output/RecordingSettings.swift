@@ -64,21 +64,6 @@ final class RecordingSettings: ObservableObject {
         defaults.set(resolution.rawValue, forKey: Self.resolutionKey)
     }
 
-    /// Pro -> free degradation, gated through the same `Capability` mapping
-    /// every other Pro feature uses (see Capability.swift's `RecordingSettings.
-    /// Format`/`.Resolution` extensions) — never a standalone flag.
-    ///
-    /// This is also the SECOND gate, called again at every record start
-    /// (AppModel.toggleRecord): a persisted UserDefaults value is not a
-    /// trusted entitlement check on its own — a stale ProRes/4K selection
-    /// left over from before a purchase, a refund, or a debug build must be
-    /// re-validated against the live entitlement before it ever reaches
-    /// AVAssetWriter, not just at the moment the user picked it in the UI.
-    func enforceFreeTier(isPro: Bool) {
-        if format.requiredCapability != nil, !isPro { format = .h264 }
-        if resolution.requiredCapability != nil, !isPro { resolution = .p1080 }
-    }
-
     /// Output dimensions per the app's long-edge resolution semantics: the
     /// resolution option sets the LONG edge, the short edge derives from the
     /// canvas aspect, and both round down to even numbers for encoder

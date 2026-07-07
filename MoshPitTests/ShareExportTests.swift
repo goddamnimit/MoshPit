@@ -228,63 +228,6 @@ final class ShareExportTests: XCTestCase {
         suite.removePersistentDomain(forName: Self.settingsSuite)
     }
 
-    func testRecordingSettingsFreeTierEnforcement() {
-        let suite = UserDefaults(suiteName: Self.settingsSuite)!
-        suite.removePersistentDomain(forName: Self.settingsSuite)
-        let settings = RecordingSettings(defaults: suite)
-        settings.format = .proRes4444
-        settings.resolution = .p4K
-        settings.enforceFreeTier(isPro: false)
-        XCTAssertEqual(settings.format, .h264)
-        XCTAssertEqual(settings.resolution, .p1080)
-        suite.removePersistentDomain(forName: Self.settingsSuite)
-    }
-
-    /// The other half of the same check: a Pro user's selections must
-    /// survive — enforceFreeTier only ever downgrades, never touches a
-    /// legitimately-entitled Pro session.
-    func testRecordingSettingsRetainsProSelectionsWhenPro() {
-        let suite = UserDefaults(suiteName: Self.settingsSuite)!
-        suite.removePersistentDomain(forName: Self.settingsSuite)
-        let settings = RecordingSettings(defaults: suite)
-        settings.format = .proRes4444
-        settings.resolution = .p4K
-        settings.enforceFreeTier(isPro: true)
-        XCTAssertEqual(settings.format, .proRes4444)
-        XCTAssertEqual(settings.resolution, .p4K)
-        suite.removePersistentDomain(forName: Self.settingsSuite)
-    }
-
-    /// Regression test for the exposure this task closes: a stale
-    /// UserDefaults-persisted ProRes/4K selection (pre-purchase, post-refund,
-    /// or from a debug build) must NOT reach AVAssetWriter for a free user.
-    /// AppModel.toggleRecord() is the exact call path recording start goes
-    /// through, so this exercises the real seam, not just RecordingSettings
-    /// in isolation.
-    func testToggleRecordReEnforcesFreeTierAtRecordStart() throws {
-        let app = AppModel()
-        try XCTSkipIf(app.ctx == nil, "Metal unavailable")
-        app.debugSetPro(false)
-        defer {
-            // UserDefaults.standard is process-wide — don't leak a Pro-only
-            // selection into other tests' AppModel instances.
-            app.recordingSettings.format = .h264
-            app.recordingSettings.resolution = .p1080
-        }
-
-        // Simulate a stale persisted Pro-only selection surviving into a
-        // free-tier session (exactly the scenario the second gate defends).
-        app.recordingSettings.format = .proRes4444
-        app.recordingSettings.resolution = .p4K
-
-        app.toggleRecord()   // starts recording -> the second gate must fire
-        XCTAssertEqual(app.recordingSettings.format, .h264,
-                       "free tier must not reach AVAssetWriter with ProRes")
-        XCTAssertEqual(app.recordingSettings.resolution, .p1080,
-                       "free tier must not reach AVAssetWriter with 4K")
-        if app.recorder?.isRecording == true { app.toggleRecord() }   // stop
-    }
-
     func testOutputSizeLongEdgeSemantics() {
         // Landscape canvas: long edge = width.
         var size = RecordingSettings.outputSize(canvasWidth: 960, canvasHeight: 540,
@@ -305,52 +248,4 @@ final class ShareExportTests: XCTestCase {
         XCTAssertEqual(size.height, 960)
     }
 
-    // MARK: - 5. Pro gating (ProRes / 4K / social export)
-
-    /// SocialExporter.export must refuse to run for a non-Pro caller even
-    /// when called directly — not just when the gallery button's
-    /// requirePro(.socialExport) wrapper is skipped. This is the defensive
-    /// check the export function owns itself, independent of any caller.
-    func testSocialExportRefusesWhenNotPro() throws {
-        let exporter = SocialExporter()
-        let url = try makeFixtureFile("not-pro.mov")
-
-        let expectation = expectation(description: "completion fires with nil")
-        exporter.export(clipURL: url, isPro: false) { result in
-            XCTAssertNil(result, "must not export for a non-Pro caller")
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 2)
-
-        XCTAssertFalse(exporter.isExporting, "must never even start the pipeline")
-        XCTAssertNotNil(exporter.lastError)
-    }
-
-    /// View-model-level check for the locked/badge state the Output sheet
-    /// and Gallery row render: exactly the ProRes/4K/social-export rows are
-    /// locked when free, and nothing is locked when Pro — same condition
-    /// (`requiredCapability != nil && !isPro`) the views evaluate.
-    func testLockedRowStateWhenFree() {
-        let isPro = false
-        for format in RecordingSettings.Format.allCases {
-            let locked = format.requiredCapability != nil && !isPro
-            XCTAssertEqual(locked, format == .proRes4444,
-                           "\(format) locked state must match Pro-only status")
-        }
-        for resolution in RecordingSettings.Resolution.allCases {
-            let locked = resolution.requiredCapability != nil && !isPro
-            XCTAssertEqual(locked, resolution == .p4K,
-                           "\(resolution) locked state must match Pro-only status")
-        }
-    }
-
-    func testNoRowsLockedWhenPro() {
-        let isPro = true
-        for format in RecordingSettings.Format.allCases {
-            XCTAssertFalse(format.requiredCapability != nil && !isPro)
-        }
-        for resolution in RecordingSettings.Resolution.allCases {
-            XCTAssertFalse(resolution.requiredCapability != nil && !isPro)
-        }
-    }
 }

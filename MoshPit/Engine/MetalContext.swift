@@ -22,7 +22,7 @@ final class MetalContext {
         for name in ["blockMatch", "moshCanvas", "resetCanvas", "motionStats",
                      "echoEffect", "echoStore", "slitscanEffect", "weaverEffect",
                      "pixelSortEffect", "procAmpEffect", "blitScale",
-                     "struktPass", "mixWipe", "finisherPass", "watermarkBlit"] {
+                     "struktPass", "mixWipe", "finisherPass"] {
             guard let fn = library.makeFunction(name: name),
                   let ps = try? device.makeComputePipelineState(function: fn) else { return nil }
             pipelines[name] = ps

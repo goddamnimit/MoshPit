@@ -22,9 +22,6 @@ final class MoshRenderer: NSObject, MTKViewDelegate {
     let engine: MoshEngine
     let effects: EffectChain
     let finisher: FinisherPass
-    /// Shared watermark/blit choke point for exported artifacts (snapshots
-    /// here, recordings in MoshRecorder). Output-format textures only.
-    let watermarkCompositor: WatermarkCompositor
     private let params: ParameterStore
     private let sources: SourceManager
     private let automation: AutomationEngine
@@ -55,12 +52,8 @@ final class MoshRenderer: NSObject, MTKViewDelegate {
     /// path. Captures the post-finisher frame: what you see is what you save.
     private var snapshotHandler: ((MTLTexture?) -> Void)?
     private var snapshotTex: MTLTexture?
-    /// Latched per snapshot at trigger time (free tier watermarking).
-    private var snapshotWatermark = false
 
-    func requestSnapshot(watermark: Bool = false,
-                         _ handler: @escaping (MTLTexture?) -> Void) {
-        snapshotWatermark = watermark
+    func requestSnapshot(_ handler: @escaping (MTLTexture?) -> Void) {
         snapshotHandler = handler
     }
 
@@ -82,10 +75,13 @@ final class MoshRenderer: NSObject, MTKViewDelegate {
             DispatchQueue.main.async { handler(nil) }
             return
         }
-        // Same compositor as the recorder — the ONLY watermark code path.
-        watermarkCompositor.encodeBlit(from: final, to: dst,
-                                       watermark: snapshotWatermark,
-                                       commandBuffer: cb)
+        if let enc = cb.makeComputeCommandEncoder() {
+            enc.label = "snapshot.blit"
+            enc.setTexture(final, index: 0)
+            enc.setTexture(dst, index: 1)
+            ctx.dispatch(enc, "blitScale", width: dst.width, height: dst.height)
+            enc.endEncoding()
+        }
         cb.addCompletedHandler { _ in handler(dst) }
     }
     var onStats: ((FrameStats) -> Void)?
@@ -113,7 +109,6 @@ final class MoshRenderer: NSObject, MTKViewDelegate {
         engine = MoshEngine(ctx: ctx, params: params)
         effects = EffectChain(ctx: ctx, params: params)
         finisher = FinisherPass(ctx: ctx, params: params)
-        watermarkCompositor = WatermarkCompositor(ctx: ctx)
         strukt = StruktEngine(params: params)
         trace = TraceRenderer(ctx: ctx, params: params)
         super.init()

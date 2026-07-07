@@ -231,14 +231,6 @@ final class ParameterStore: ObservableObject {
     private var lock = os_unfair_lock_s()
     let changes = PassthroughSubject<ParameterChange, Never>()
 
-    /// Optional write gate (freemium): return false to reject the write —
-    /// value unchanged, no change event. Consulted for every non-`.system`
-    /// write, so touch, keyboard, MIDI, mod-matrix, and automation are all
-    /// gated at this one choke point. May be called off-main (render/MIDI
-    /// threads); implementations must be thread-safe. nil = allow everything
-    /// (unit tests, previews).
-    var writeGate: ((ParameterID, Float, ParameterOrigin) -> Bool)?
-
     init() {
         var v = [ParameterID: Float]()
         for id in ParameterID.allCases { v[id] = id.defaultValue }
@@ -252,9 +244,6 @@ final class ParameterStore: ObservableObject {
 
     func set(_ id: ParameterID, _ raw: Float, origin: ParameterOrigin = .ui) {
         let value = min(max(raw, id.range.lowerBound), id.range.upperBound)
-        // .system bypasses the gate: enforceFreeTierState and debug hooks
-        // must be able to snap gated params back to their defaults.
-        if origin != .system, let writeGate, !writeGate(id, value, origin) { return }
         os_unfair_lock_lock(&lock)
         let old = values[id]
         values[id] = value

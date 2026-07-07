@@ -2,7 +2,7 @@ import AVFoundation
 import UIKit
 import Combine
 
-// MARK: - Social-optimized export (Pro): 1080x1920 H.264 30fps ~8Mbps
+// MARK: - Social-optimized export: 1080x1920 H.264 30fps ~8Mbps
 
 /// Render transform for fitting `sourceSize` into `target` (1080x1920).
 /// Rule: within 5% of the target aspect -> scale-to-fill (minor crop);
@@ -56,22 +56,7 @@ final class SocialExporter: NSObject, ObservableObject {
     /// Kick off the export. `completion` fires on main with the exported file
     /// URL (in the temp dir, reclaimed by the session sweep — deliberately
     /// NOT added to sessionClips), or nil on failure/cancel.
-    ///
-    /// `isPro` is re-checked HERE, not just by the caller (Gallery.swift's
-    /// Share-to-Social button, which already wraps this in
-    /// `AppModel.requirePro(.socialExport)`): Capability.socialExport gates
-    /// this feature, and a call site is not a trusted enforcement point on
-    /// its own — this re-encode must refuse to run for a non-Pro caller no
-    /// matter how it's invoked. Equivalent to
-    /// `ProManager.shared.allows(.socialExport)`, passed in rather than read
-    /// directly so this class stays free of a ProManager/MainActor
-    /// dependency (same reasoning as AppModel's lock-free `ProFlag` mirror).
-    func export(clipURL: URL, isPro: Bool, completion: @escaping (URL?) -> Void) {
-        guard isPro else {
-            lastError = "MoshPit Pro required for social export"
-            completion(nil)
-            return
-        }
+    func export(clipURL: URL, completion: @escaping (URL?) -> Void) {
         guard !isExporting else { return }
         isExporting = true
         progress = 0

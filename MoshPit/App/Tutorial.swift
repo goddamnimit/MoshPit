@@ -15,10 +15,6 @@ struct CoachStop: Equatable {
     let text: String
     /// Drawer that must be open for this stop (tutorial opens/closes it).
     let drawer: DrawerSide?
-    /// Non-nil when the stop's subject is a Pro capability: renders a PRO
-    /// badge in the callout for free users. (None of the current 12 stops is
-    /// exclusively about a Pro feature, so all are nil today.)
-    var requiredCapability: Capability? = nil
 }
 
 enum CoachScript {
@@ -92,7 +88,6 @@ extension View {
 /// bubble, tap-anywhere-to-advance, and an ever-present Skip.
 struct CoachOverlay: View {
     @EnvironmentObject var app: AppModel
-    @ObservedObject var pro = ProManager.shared
     let frames: [CoachAnchor: CGRect]
 
     var body: some View {
@@ -178,7 +173,6 @@ struct CoachOverlay: View {
         } label: {
             VStack(alignment: .leading, spacing: Theme.g1) {
                 // Content only — spotlight/positioning logic is untouched.
-                if stop.requiredCapability != nil, !pro.isPro { ProBadge() }
                 Text(stop.text)
                     .font(.body)
                     .foregroundStyle(Theme.textPrimary)
@@ -286,11 +280,6 @@ struct DemoCard: Identifiable {
     let section: String
     let title: String
     let blurb: String
-    /// Non-nil when the demo's subject is Pro: renders a PRO badge for free
-    /// users. Demos stay browsable/launchable either way (honest marketing) —
-    /// if the setup actually engages a Pro capability it hits the normal gate
-    /// and shows the upgrade sheet with context.
-    var requiredCapability: Capability? = nil
     let setup: (AppModel) -> Void
 }
 
@@ -342,36 +331,31 @@ enum DemoLibrary {
             app.activeTip = "Stay still, then move suddenly. Moving areas erupt with frozen detail. Lower Threshold = more sensitive."
         },
         DemoCard(id: "tbloom", section: "Mosh Modes", title: "Timed Bloom",
-                 blurb: "Blooms fire on a timer, direction of their own.",
-                 requiredCapability: .modeTBloom) { app in
+                 blurb: "Blooms fire on a timer, direction of their own.",) { app in
             app.selectMode(.timedBloom)
             app.openDrawer(.right)
             app.highlightParam = .bloomRate
             app.activeTip = "Blooms fire automatically on a timer. Rate controls how often. Try slow Rate with sudden movement between blooms."
         },
         DemoCard(id: "drift", section: "Mosh Modes", title: "Directional Drift",
-                 blurb: "Push the whole frame with the XY pad.",
-                 requiredCapability: .modeDrift) { app in
+                 blurb: "Push the whole frame with the XY pad.",) { app in
             app.selectMode(.drift)
             app.openDrawer(.right)
             app.activeTip = "The XY pad controls the direction pixels smear. Push everything to one corner. Great for slow hypnotic flows."
         },
         DemoCard(id: "mix", section: "Mosh Modes", title: "Mix Wet/Dry",
-                 blurb: "Blend fresh frames into the smear.",
-                 requiredCapability: .modeMix) { app in
+                 blurb: "Blend fresh frames into the smear.",) { app in
             app.selectMode(.mixMosh)
             app.openDrawer(.right)
             app.activeTip = "The crossfader blends fresh frames into the smear continuously. All the way left = frozen. All the way right = clean. Middle = the sweet spot."
         },
         DemoCard(id: "cross", section: "Mosh Modes", title: "Cross Mosh",
-                 blurb: "One source's motion drives the other's pixels.",
-                 requiredCapability: .modeCross) { app in
+                 blurb: "One source's motion drives the other's pixels.",) { app in
             app.selectMode(.crossMosh)
             app.activeTip = "Load two different sources in slot A and B (Sources panel). Motion from one drives the pixels of the other. Flip the camera mid-mosh for instant cross-mosh between front and rear."
         },
         DemoCard(id: "feedback", section: "Mosh Modes", title: "Feedback Loop",
-                 blurb: "The canvas zooms and rotates into itself.",
-                 requiredCapability: .modeFeedback) { app in
+                 blurb: "The canvas zooms and rotates into itself.",) { app in
             app.selectMode(.feedback)
             app.openDrawer(.right)
             app.activeTip = "The canvas zooms and rotates into itself every frame. Small zoom values create infinite tunnels. Hue rotation makes it cycle through color."
@@ -392,20 +376,17 @@ enum DemoLibrary {
             app.activeTip = "Tap the TAP button repeatedly in time with music. MoshPit locks to your rhythm. Everything time-synced from here uses this BPM."
         },
         DemoCard(id: "lfo", section: "Rhythm & Timing", title: "LFO Basics",
-                 blurb: "Make any parameter pulse automatically.",
-                 requiredCapability: .lfo) { app in
+                 blurb: "Make any parameter pulse automatically.",) { app in
             app.openSheet(.control)
             app.activeTip = "LFO 1 is a wave that goes up and down at your tempo. Set its waveform and rate, then drag it to a destination in the mod matrix to make any parameter pulse automatically."
         },
         DemoCard(id: "rhythmwipe", section: "Rhythm & Timing", title: "Rhythmic Source Switching",
-                 blurb: "Beat-synced cuts between A and B.",
-                 requiredCapability: .lfo) { app in
+                 blurb: "Beat-synced cuts between A and B.",) { app in
             app.openSheet(.control)
             app.activeTip = "Load two clips or use camera + clip. Route LFO 1 to Mix Crossfader with a square wave. Your sources now cut rhythmically on the beat."
         },
         DemoCard(id: "strobe", section: "Rhythm & Timing", title: "Strobe Flash",
-                 blurb: "Beat-gated blackout/whiteout flashes.",
-                 requiredCapability: .lfo) { app in
+                 blurb: "Beat-gated blackout/whiteout flashes.",) { app in
             app.openSheet(.control)
             app.activeTip = "Route an LFO to the Blackout destination in the strobe section. Square wave at 1/2 rate = flash on every other beat. Keep the flicker limiter ON unless you know your audience."
         },
@@ -420,26 +401,22 @@ enum DemoLibrary {
             app.activeTip = "Tap slot A to load a clip from your Photos library. It loops automatically and feeds the mosh engine just like the camera."
         },
         DemoCard(id: "reverse", section: "Sources & Mixing", title: "Reverse Playback",
-                 blurb: "Play any clip backwards, mid-mosh.",
-                 requiredCapability: .reversePlayback) { app in
+                 blurb: "Play any clip backwards, mid-mosh.",) { app in
             app.openSheet(.sources)
             app.activeTip = "Toggle Reverse on any video slot to play it backwards. Try it mid-mosh — the smear reverses direction as the motion vectors flip."
         },
         DemoCard(id: "selfcross", section: "Sources & Mixing", title: "Self Cross-Mosh",
-                 blurb: "A clip smears itself with its own motion.",
-                 requiredCapability: .sourceSlotB) { app in
+                 blurb: "A clip smears itself with its own motion.",) { app in
             app.openSheet(.sources)
             app.activeTip = "Load the same clip into both slot A and B, then select Cross mode. The video smears itself with its own motion. Desync the clips for stranger results."
         },
         DemoCard(id: "lumawipe", section: "Sources & Mixing", title: "Luma Wipe",
-                 blurb: "Brightness-keyed transitions between sources.",
-                 requiredCapability: .sourceSlotB) { app in
+                 blurb: "Brightness-keyed transitions between sources.",) { app in
             app.openSheet(.sources)
             app.activeTip = "Set wipe mode to Luma in the Mix section. Drag the threshold — bright areas of the frame transition to source B first, dark areas last. Automate this with an LFO for rhythmic wipes."
         },
         DemoCard(id: "videomod", section: "Sources & Mixing", title: "Video as Controller",
-                 blurb: "A hidden clip drives your parameters.",
-                 requiredCapability: .sourceSlotMOD) { app in
+                 blurb: "A hidden clip drives your parameters.",) { app in
             app.openSheet(.control)
             app.activeTip = "Load a clip into the MOD slot — it never appears on screen. Its brightness and motion control any parameter you route it to. A flickering fire clip in MOD = fire-driven bloom."
         },
@@ -449,20 +426,17 @@ enum DemoLibrary {
 
     private static let visualEffects: [DemoCard] = [
         DemoCard(id: "mirror", section: "Visual Effects", title: "Mirror Modes",
-                 blurb: "Symmetry, applied after the mosh.",
-                 requiredCapability: .mirrorModes) { app in
+                 blurb: "Symmetry, applied after the mosh.",) { app in
             app.openSheet(.effects)
             app.activeTip = "Try Quad mirror with Smear active — your face becomes a symmetrical glitch mandala. Mirror applies after the mosh so smeared pixels get mirrored too."
         },
         DemoCard(id: "invert", section: "Visual Effects", title: "Color Invert",
-                 blurb: "Negative-space glitch explosions.",
-                 requiredCapability: .colorModes) { app in
+                 blurb: "Negative-space glitch explosions.",) { app in
             app.openSheet(.effects)
             app.activeTip = "Invert flips all colors. Combined with Bloom it creates a negative-space explosion effect."
         },
         DemoCard(id: "duotone", section: "Visual Effects", title: "Duotone",
-                 blurb: "Two-color grade over any mosh.",
-                 requiredCapability: .colorModes) { app in
+                 blurb: "Two-color grade over any mosh.",) { app in
             app.openSheet(.effects)
             app.activeTip = "Duotone maps your image to two colors — shadow hue and highlight hue. Route an LFO to Hue Shift instead for continuous color cycling."
         },
@@ -482,31 +456,27 @@ enum DemoLibrary {
 
     private static let threeD: [DemoCard] = [
         DemoCard(id: "cloud", section: "3D", title: "Point Cloud",
-                 blurb: "Your glitch becomes floating dots.",
-                 requiredCapability: .geometry3D) { app in
+                 blurb: "Your glitch becomes floating dots.",) { app in
             app.params.set(.trace3D, 1, origin: .ui)
             app.params.set(.traceMode, 0, origin: .ui)   // points
             app.openSheet(.threeD)
             app.activeTip = "Your moshed video becomes a cloud of glowing dots displaced by brightness. Drag to orbit, pinch to zoom."
         },
         DemoCard(id: "wireframe", section: "3D", title: "Wireframe Face",
-                 blurb: "Your video as a displaced grid mesh.",
-                 requiredCapability: .geometry3D) { app in
+                 blurb: "Your video as a displaced grid mesh.",) { app in
             app.params.set(.trace3D, 1, origin: .ui)
             app.params.set(.traceMode, 1, origin: .ui)   // wireframe
             app.openSheet(.threeD)
             app.activeTip = "The mesh shows the geometry of your video as a grid. Luma depth amount pushes bright areas toward you."
         },
         DemoCard(id: "object", section: "3D", title: "Textured Object",
-                 blurb: "Wrap the mosh around a sphere or torus.",
-                 requiredCapability: .geometry3D) { app in
+                 blurb: "Wrap the mosh around a sphere or torus.",) { app in
             app.params.set(.trace3D, 1, origin: .ui)
             app.openSheet(.threeD)
             app.activeTip = "Switch the primitive to Sphere or Torus — your moshed video wraps around it as a skin. Point cloud on a torus is particularly strange."
         },
         DemoCard(id: "bloom3d", section: "3D", title: "3D + Bloom",
-                 blurb: "Eruptions across the geometry surface.",
-                 requiredCapability: .geometry3D) { app in
+                 blurb: "Eruptions across the geometry surface.",) { app in
             app.activeTip = "Switch to Bloom mode while in 3D point cloud. Bloom eruptions appear on the geometry surface. Add auto-rotate for a self-animating visual instrument."
         },
     ]
@@ -519,13 +489,11 @@ enum DemoLibrary {
             app.activeTip = "Tap Record before you start. Tap again to stop and save. Recordings capture everything including mirror modes, color, and 3D geometry at full resolution."
         },
         DemoCard(id: "ndi", section: "Output", title: "NDI to Resolume",
-                 blurb: "Stream live into your VJ setup.",
-                 requiredCapability: .ndiOutput) { app in
+                 blurb: "Stream live into your VJ setup.",) { app in
             app.activeTip = "Toggle NDI in the Output panel. Accept the local network permission prompt. Open Resolume on the same Wi-Fi and look for MoshPit in the NDI sources. Your mosh streams live to your VJ setup."
         },
         DemoCard(id: "automation", section: "Output", title: "Automation",
-                 blurb: "Record knob moves, replay them anywhere.",
-                 requiredCapability: .automation) { app in
+                 blurb: "Record knob moves, replay them anywhere.",) { app in
             app.openSheet(.automation)
             app.activeTip = "Hit Record in the Automation panel, perform your parameter changes, then stop. Play it back over any source — your performance is now a reusable loop."
         },
@@ -534,7 +502,6 @@ enum DemoLibrary {
 
 struct DemoSheet: View {
     @EnvironmentObject var app: AppModel
-    @ObservedObject var pro = ProManager.shared
     @Environment(\.dismiss) private var dismiss
     /// Collapsed by default except Basics — scanning 7 headers beats
     /// scrolling 30 cards.
@@ -611,7 +578,6 @@ struct DemoSheet: View {
         VStack(alignment: .leading, spacing: Theme.g1) {
             HStack(spacing: Theme.gHalf) {
                 Text(demo.title).font(Theme.label).foregroundStyle(Theme.textPrimary)
-                if demo.requiredCapability != nil, !pro.isPro { ProBadge() }
             }
             Text(demo.blurb)
                 .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
