@@ -1,12 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  StoreKit sandbox testing: the Run and Test actions reference
-  MoshPit/Configuration/MoshPit.storekit so purchases work in Simulator and
-  on device with no App Store Connect account. For TestFlight/production
-  builds the configuration file is ignored and real App Store entitlements
-  are used automatically — no code changes needed between sandbox and
-  production.
--->
 <Scheme
    LastUpgradeVersion = "2600"
    version = "1.7">
