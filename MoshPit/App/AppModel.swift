@@ -172,14 +172,16 @@ final class AppModel: ObservableObject {
             // Portrait, like the front camera — exercises the aspect path.
             sources.setTestPattern(slot: .a, portrait: true)
         } else if !ProcessInfo.processInfo.arguments.contains("-nocamera") {
-            if AVCaptureDevice.authorizationStatus(for: .video) == .authorized {
+            let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            if authStatus == .authorized || authStatus == .notDetermined {
                 sources.setCamera(.front, slot: .a)
             } else {
                 sources.setTestPattern(slot: .a, portrait: true)
             }
         }
         #else
-        if AVCaptureDevice.authorizationStatus(for: .video) == .authorized {
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        if authStatus == .authorized || authStatus == .notDetermined {
             sources.setCamera(.front, slot: .a)
         } else {
             sources.setTestPattern(slot: .a, portrait: true)

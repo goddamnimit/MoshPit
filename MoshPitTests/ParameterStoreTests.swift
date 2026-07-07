@@ -1,5 +1,6 @@
 import XCTest
 import Combine
+import AVFoundation
 @testable import MoshPit
 
 final class ParameterStoreTests: XCTestCase {
@@ -42,5 +43,25 @@ final class ParameterStoreTests: XCTestCase {
             _ = store.get(.motionGain)
         }
         XCTAssertTrue(ParameterID.motionGain.range.contains(store.get(.motionGain)))
+    }
+
+    func testCameraDefaultOnLaunch() {
+        let auth = AVCaptureDevice.authorizationStatus(for: .video)
+        let app = AppModel()
+        guard let sources = app.sources else {
+            XCTFail("SourceManager is nil")
+            return
+        }
+        
+        let exp = expectation(description: "names populated")
+        DispatchQueue.main.async {
+            if auth == .authorized || auth == .notDetermined {
+                XCTAssertTrue(sources.names[.a]?.contains("Camera") ?? false, "Default source on launch should be camera when authorized/notDetermined, got: \(String(describing: sources.names[.a]))")
+            } else {
+                XCTAssertTrue(sources.names[.a]?.contains("Pattern") ?? false, "Default source on launch should be test pattern when denied/restricted, got: \(String(describing: sources.names[.a]))")
+            }
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 2)
     }
 }

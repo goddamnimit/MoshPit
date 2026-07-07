@@ -289,10 +289,11 @@ final class SmokeTests: XCTestCase {
             while CACurrentMediaTime() < targetTime {
                 Thread.sleep(forTimeInterval: 0.001)
             }
+            let tickTime = CACurrentMediaTime()
             engine.tick()
 
             if let playCursor = mirror.descendant("playCursor") as? Int {
-                let elapsed = targetTime - playStart
+                let elapsed = tickTime - playStart
                 let expectedCursor = loadedSession.events.filter { $0.t <= elapsed }.count
                 XCTAssertLessThanOrEqual(abs(playCursor - expectedCursor), 2, "Cursor mismatch at frame \(frame)")
             }
