@@ -68,8 +68,10 @@ struct GalleryPanel: View {
     }
 
     private func socialExport(_ clip: SessionClip) {
-        app.requirePro(.socialExport) { [exporter] in
-            exporter.export(clipURL: clip.url) { url in
+        app.requirePro(.socialExport) { [exporter, app] in
+            // SocialExporter.export re-checks isPro itself (see its doc
+            // comment) — this is defense in depth, not the only gate.
+            exporter.export(clipURL: clip.url, isPro: app.isPro) { url in
                 if let url { ShareSheetPresenter.present(fileURL: url) }
             }
         }
@@ -116,6 +118,14 @@ private struct ClipRow: View {
                 }
             }
             .buttonStyle(.plain)
+
+            // Visible before the menu even opens — same lock treatment as the
+            // Output sheet's ExportSettingsSection rows (ProBadge). The menu
+            // item itself can't host that badge (Menu rows are plain
+            // Label rows), so it keeps a lock icon + "Pro" suffix as the
+            // closest in-menu equivalent; tapping either still routes
+            // through AppModel.requirePro(.socialExport) -> presentUpgrade.
+            if !app.isPro { ProBadge() }
 
             Menu {
                 Button {

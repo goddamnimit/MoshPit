@@ -43,6 +43,27 @@ final class StoreTests: XCTestCase {
         XCTAssertNil(ParameterID.flickerLimit.requiredCapability, "safety cap stays free")
     }
 
+    /// The three sharing/export capabilities, named explicitly: covered by
+    /// testAllowsReflectsEntitlement's blanket loop too, but named here so a
+    /// regression on any one of them fails with an unambiguous test name.
+    func testProResExport4KSocialExportGateCorrectly() {
+        let free = ProManager(debugOverrideIsPro: false)
+        let pro = ProManager(debugOverrideIsPro: true)
+        for capability: Capability in [.proResExport, .export4K, .socialExport] {
+            XCTAssertFalse(free.allows(capability), "free tier must not allow \(capability)")
+            XCTAssertTrue(pro.allows(capability), "pro must allow \(capability)")
+        }
+        // Same mapping the Output sheet's ExportSettingsSection reads for
+        // its locked/badge state — free is the only nil case.
+        XCTAssertNil(RecordingSettings.Format.h264.requiredCapability)
+        XCTAssertNil(RecordingSettings.Format.hevc.requiredCapability)
+        XCTAssertEqual(RecordingSettings.Format.proRes4444.requiredCapability, .proResExport)
+        XCTAssertNil(RecordingSettings.Resolution.matchCanvas.requiredCapability)
+        XCTAssertNil(RecordingSettings.Resolution.p720.requiredCapability)
+        XCTAssertNil(RecordingSettings.Resolution.p1080.requiredCapability)
+        XCTAssertEqual(RecordingSettings.Resolution.p4K.requiredCapability, .export4K)
+    }
+
     func testParameterStoreRejectsGatedWritesWhenFree() {
         let app = AppModel()
         app.debugSetPro(false)

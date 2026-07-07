@@ -314,7 +314,7 @@ final class AppModel: ObservableObject {
                 params.set(id, id.defaultValue, origin: .system)
             }
         }
-        recordingSettings.enforceFreeTier()   // ProRes/4K are Pro-only
+        recordingSettings.enforceFreeTier(isPro: proFlag.value)   // ProRes/4K are Pro-only
     }
 
     /// Output toggles are gated HERE (the toggle-on action), never inside
@@ -598,9 +598,12 @@ final class AppModel: ObservableObject {
         guard let recorder, let renderer else { return }
         if recorder.isRecording { recorder.stop() }
         else {
-            // Free tier can't hold Pro-only export settings (stale persisted
-            // values after a refund): coerce before latching.
-            if !proFlag.value { recordingSettings.enforceFreeTier() }
+            // SECOND gate (see RecordingSettings.enforceFreeTier doc): the UI
+            // already blocks picking ProRes/4K without Pro, but a persisted
+            // UserDefaults value is never trusted on its own — re-validate
+            // against the live entitlement right before it reaches the
+            // writer, every time, not just after a refund.
+            recordingSettings.enforceFreeTier(isPro: proFlag.value)
             var w = renderer.engine.canvasWidth, h = renderer.engine.canvasHeight
             if let longEdge = recordingSettings.resolution.longEdge {
                 // Export resolution sets the LONG edge; short edge derives

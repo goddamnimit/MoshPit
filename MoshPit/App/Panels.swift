@@ -686,9 +686,9 @@ private struct ExportSettingsSection: View {
             ForEach(RecordingSettings.Format.allCases) { format in
                 optionRow(title: format.rawValue,
                           selected: settings.format == format,
-                          locked: format.isProOnly && !app.isPro) {
-                    if format.isProOnly {
-                        app.requirePro(.proResExport) { settings.format = format }
+                          locked: format.requiredCapability != nil && !app.isPro) {
+                    if let capability = format.requiredCapability {
+                        app.requirePro(capability) { settings.format = format }
                     } else {
                         settings.format = format
                     }
@@ -698,9 +698,9 @@ private struct ExportSettingsSection: View {
             ForEach(RecordingSettings.Resolution.allCases) { res in
                 optionRow(title: res.rawValue,
                           selected: settings.resolution == res,
-                          locked: res.isProOnly && !app.isPro) {
-                    if res.isProOnly {
-                        app.requirePro(.export4K) { settings.resolution = res }
+                          locked: res.requiredCapability != nil && !app.isPro) {
+                    if let capability = res.requiredCapability {
+                        app.requirePro(capability) { settings.resolution = res }
                     } else {
                         settings.resolution = res
                     }

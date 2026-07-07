@@ -17,8 +17,6 @@ final class RecordingSettings: ObservableObject {
         case hevc = "HEVC"
         case proRes4444 = "ProRes 4444"
         var id: String { rawValue }
-        /// ProRes is Pro-only (freemium gate).
-        var isProOnly: Bool { self == .proRes4444 }
         var codecType: AVVideoCodecType {
             switch self {
             case .h264: return .h264
@@ -34,8 +32,6 @@ final class RecordingSettings: ObservableObject {
         case p1080 = "1080p"
         case p4K = "4K"
         var id: String { rawValue }
-        /// 4K is Pro-only (freemium gate).
-        var isProOnly: Bool { self == .p4K }
         /// Long-edge pixels; nil = match the canvas resolution.
         var longEdge: Int? {
             switch self {
@@ -68,10 +64,19 @@ final class RecordingSettings: ObservableObject {
         defaults.set(resolution.rawValue, forKey: Self.resolutionKey)
     }
 
-    /// Pro -> free degradation: snap Pro-only choices back to free defaults.
-    func enforceFreeTier() {
-        if format.isProOnly { format = .h264 }
-        if resolution.isProOnly { resolution = .p1080 }
+    /// Pro -> free degradation, gated through the same `Capability` mapping
+    /// every other Pro feature uses (see Capability.swift's `RecordingSettings.
+    /// Format`/`.Resolution` extensions) — never a standalone flag.
+    ///
+    /// This is also the SECOND gate, called again at every record start
+    /// (AppModel.toggleRecord): a persisted UserDefaults value is not a
+    /// trusted entitlement check on its own — a stale ProRes/4K selection
+    /// left over from before a purchase, a refund, or a debug build must be
+    /// re-validated against the live entitlement before it ever reaches
+    /// AVAssetWriter, not just at the moment the user picked it in the UI.
+    func enforceFreeTier(isPro: Bool) {
+        if format.requiredCapability != nil, !isPro { format = .h264 }
+        if resolution.requiredCapability != nil, !isPro { resolution = .p1080 }
     }
 
     /// Output dimensions per the app's long-edge resolution semantics: the

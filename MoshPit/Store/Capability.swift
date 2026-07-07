@@ -81,3 +81,17 @@ extension ParameterID {
         }
     }
 }
+
+extension RecordingSettings.Format {
+    /// nil = free (H.264 / HEVC). ProRes 4444 is Pro-only.
+    var requiredCapability: Capability? {
+        self == .proRes4444 ? .proResExport : nil
+    }
+}
+
+extension RecordingSettings.Resolution {
+    /// nil = free (Match Canvas / 720p / 1080p). 4K is Pro-only.
+    var requiredCapability: Capability? {
+        self == .p4K ? .export4K : nil
+    }
+}
