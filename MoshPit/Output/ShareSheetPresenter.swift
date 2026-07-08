@@ -25,6 +25,15 @@ enum ShareSheetPresenter {
             }
             let activity = UIActivityViewController(activityItems: [fileURL],
                                                     applicationActivities: nil)
+            // Sharing itself is free for everyone (AirDrop, Messages, Reels,
+            // Files, …). But UIActivityViewController's built-in "Save Video"
+            // action IS a Photos write — leaving it in would bypass the one
+            // Pro gate (Capability.saveVideoToPhotos), so it is excluded for
+            // video files while un-entitled. Snapshots (images) are never
+            // affected: photo saving is not gated.
+            activity.excludedActivityTypes = MainActor.assumeIsolated {
+                excludedActivityTypes(for: fileURL, isPro: ProManager.shared.isPro)
+            }
             // iPad idiom: anchor the popover defensively even though iPhone
             // portrait is the primary target.
             if let pop = activity.popoverPresentationController {
@@ -36,5 +45,15 @@ enum ShareSheetPresenter {
             }
             top.present(activity, animated: true)
         }
+    }
+
+    /// Pure policy helper (unit-tested): only video files, and only while
+    /// un-entitled, lose the sheet's built-in Save Video action.
+    static func excludedActivityTypes(for url: URL,
+                                      isPro: Bool) -> [UIActivity.ActivityType]? {
+        let videoExtensions: Set<String> = ["mov", "mp4", "m4v"]
+        guard !isPro, videoExtensions.contains(url.pathExtension.lowercased())
+        else { return nil }
+        return [.saveToCameraRoll]
     }
 }

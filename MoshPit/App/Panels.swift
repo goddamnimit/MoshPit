@@ -646,6 +646,62 @@ struct OutputPanel: View {
                 Text("NDI runs at canvas resolution, capped by this. Recording uses it only when Export resolution is Match Canvas.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
+            ProStatusSection()
+        }
+    }
+}
+
+// MARK: - Pro status (Output sheet)
+
+/// Save-to-Photos unlock status, Restore Purchases, and a Redeem Code row —
+/// reachable here so a code can be entered before ever hitting the save gate.
+private struct ProStatusSection: View {
+    @ObservedObject var pro = ProManager.shared
+    @State private var showRedeemField = false
+
+    var body: some View {
+        Section("Save to Photos") {
+            if pro.isPro {
+                // The entitlement source stays visible for support/debugging.
+                Text(pro.storeEntitled ? "Unlocked ✓" : "Unlocked ✓ (redeem code)")
+                    .font(Theme.label)
+                    .foregroundStyle(Theme.accent)
+            } else {
+                Button {
+                    Task { await pro.restore() }
+                } label: {
+                    HStack {
+                        Text("Restore Purchases").font(Theme.label)
+                        Spacer()
+                        if pro.purchaseState == .restoring {
+                            ProgressView().tint(Theme.textSecondary)
+                        }
+                    }
+                }
+                .disabled(pro.purchaseState == .restoring)
+                Button {
+                    withAnimation(Theme.fade) { showRedeemField.toggle() }
+                } label: {
+                    HStack {
+                        Text("Redeem Code").font(Theme.label)
+                        Spacer()
+                        Image(systemName: showRedeemField ? "chevron.up" : "chevron.down")
+                            .font(Theme.labelSmall)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                }
+                if showRedeemField {
+                    RedeemCodeField(startsExpanded: true)
+                }
+                switch pro.purchaseState {
+                case .failed(let message):
+                    Text(message).font(Theme.labelSmall).foregroundStyle(Theme.accent)
+                case .info(let message):
+                    Text(message).font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
+                default:
+                    EmptyView()
+                }
+            }
         }
     }
 }

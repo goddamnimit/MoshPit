@@ -59,6 +59,21 @@ final class AppModel: ObservableObject {
     let recordingSettings = RecordingSettings()
     /// 9:16 social re-encode engine, driven from the gallery.
     let socialExporter = SocialExporter()
+    /// Upgrade sheet (save-to-Photos paywall). Presented ONLY via
+    /// presentUpgrade(for:), which respects the overlay mutual-exclusivity
+    /// system.
+    @Published var showUpgradeSheet = false
+    /// The capability whose gate the user hit (there is exactly one today).
+    private(set) var upgradeCapability: Capability?
+    /// Completes the originally-blocked action when isPro flips true while
+    /// the upgrade sheet is up (i.e. saves the pending recording to Photos).
+    private var pendingProAction: (() -> Void)?
+    #if DEBUG
+    /// Test hook: overrides the entitlement check (the shared ProManager
+    /// defaults to Pro under XCTest). nil = read ProManager.shared.
+    private var debugProOverride: Bool?
+    func debugSetPro(_ isPro: Bool?) { debugProOverride = isPro }
+    #endif
 
     enum Panel: String, Identifiable, CaseIterable {
         case sources = "Sources", effects = "Effects", threeD = "3D",
@@ -108,6 +123,8 @@ final class AppModel: ObservableObject {
 
         guard let ctx else {
             sources = nil; renderer = nil; recorder = nil; mjpeg = nil; ndi = nil
+            // AppModel is always created on main (@StateObject / tests on main).
+            MainActor.assumeIsolated { bindProManager() }
             return
         }
         let sources = SourceManager(device: ctx.device)
@@ -136,19 +153,33 @@ final class AppModel: ObservableObject {
         renderer.onStats = { [weak self] s in self?.stats = s }
         renderer.modTap = { [weak self] s in self?.modMatrix.apply(stats: s) }
 
+        // THE ONE PRO GATE (Capability.saveVideoToPhotos): consulted at
+        // stop() time on main. Everything else about recording — quality,
+        // formats, the session gallery, sharing — is free.
+        recorder.allowsSaveToPhotos = { [weak self] in
+            self?.entitled(.saveVideoToPhotos) ?? true
+        }
         // Recording finished: build the gallery entry (thumbnail/duration/
-        // size — blocking, so off main) and surface the Saved/Share toast.
-        recorder.onFinished = { [weak self] url, savedToPhotos in
+        // size — blocking, so off main) and surface the Saved/Share toast —
+        // or, when the save was gated, the upgrade sheet with the save kept
+        // pending. The clip is in the session gallery on every path.
+        recorder.onFinished = { [weak self] url, outcome in
             DispatchQueue.global(qos: .userInitiated).async {
                 let clip = SessionClipStore.makeClip(url: url)
                 DispatchQueue.main.async {
                     guard let self else { return }
                     if let clip { self.sessionClips.append(clip) }
-                    if savedToPhotos {
+                    switch outcome {
+                    case .saved:
                         self.showShareToast("Saved to Photos", shareURL: url)
-                    } else {
+                    case .failed:
                         self.showShareToast("Saved to session gallery — enable Photos access in Settings",
                                             shareURL: url)
+                    case .gated:
+                        self.showShareToast("Saved to session gallery", shareURL: url)
+                        self.presentUpgrade(for: .saveVideoToPhotos) { [weak self] in
+                            self?.saveVideoToPhotos(url: url)
+                        }
                     }
                 }
             }
@@ -197,6 +228,71 @@ final class AppModel: ObservableObject {
             child.receive(on: DispatchQueue.main)
                 .sink { [weak self] in self?.objectWillChange.send() }
                 .store(in: &cancellables)
+        }
+
+        // AppModel is always created on main (@StateObject / tests on main).
+        MainActor.assumeIsolated { bindProManager() }
+    }
+
+    // MARK: Pro gate (save-to-Photos only)
+
+    /// The one entitlement read. Callers are all on main (toggleRecord /
+    /// recorder.stop / share presentation).
+    private func entitled(_ capability: Capability) -> Bool {
+        #if DEBUG
+        if let debugProOverride { return debugProOverride }
+        #endif
+        return MainActor.assumeIsolated { ProManager.shared.allows(capability) }
+    }
+
+    /// React to entitlement flips: dismiss the sheet and complete the
+    /// pending save. (Nothing to degrade on Pro -> free: a refund simply
+    /// re-gates future saves; no app state depends on the entitlement.)
+    @MainActor private func bindProManager() {
+        ProManager.shared.$isPro
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isPro in
+                if isPro { self?.completePendingProAction() }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Runs (and clears) the pending gated action; dismisses the sheet.
+    /// Internal so tests can drive the purchase-success path directly.
+    func completePendingProAction() {
+        if showUpgradeSheet { showUpgradeSheet = false }
+        pendingProAction?()
+        pendingProAction = nil
+    }
+
+    /// Present the upgrade sheet through the same overlay-exclusivity rules
+    /// as openSheet(): drawers/sheets animate away first. Never re-presents
+    /// over itself.
+    func presentUpgrade(for capability: Capability, andThen action: (() -> Void)? = nil) {
+        upgradeCapability = capability
+        pendingProAction = action
+        guard !showUpgradeSheet else { return }
+        showCheatSheet = false
+        showDemoSheet = false
+        let wait = openDrawer != nil || activePanel != nil
+        openDrawer = nil
+        activePanel = nil
+        if wait {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.overlaySwap) {
+                [weak self] in self?.showUpgradeSheet = true
+            }
+        } else {
+            showUpgradeSheet = true
+        }
+    }
+
+    /// Pending-save completion (after purchase/redeem): writes the finished
+    /// recording to Photos and toasts the result.
+    func saveVideoToPhotos(url: URL) {
+        VideoPhotosSaver.save(url) { [weak self] saved, _ in
+            self?.showShareToast(saved ? "Saved to Photos"
+                                       : "Couldn't save — enable Photos access in Settings",
+                                 shareURL: url)
         }
     }
 

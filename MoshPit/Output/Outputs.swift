@@ -13,6 +13,13 @@ final class MoshRecorder: NSObject, ObservableObject,
                           AVCaptureAudioDataOutputSampleBufferDelegate {
     enum Codec: String, CaseIterable { case h264 = "H.264", hevc = "HEVC" }
 
+    /// What happened to the finished file's Photos save.
+    enum SaveOutcome {
+        case saved          // written to the Photos library
+        case failed         // Photos access denied or the save errored (see lastError)
+        case gated          // entitlement gate declined the save (free tier)
+    }
+
     @Published private(set) var isRecording = false
     @Published var codec: Codec = .hevc
     @Published var recordMic = false {
@@ -32,11 +39,17 @@ final class MoshRecorder: NSObject, ObservableObject,
     @Published private(set) var lastError: String?
 
     /// Fires on main after the file is finalized and the Photos save attempt
-    /// completes: (fileURL, savedToPhotos). The temp file is RETAINED for the
+    /// resolves: (fileURL, outcome). The temp file is RETAINED for the
     /// session gallery — its lifecycle is the launch sweep + gallery Delete +
     /// termination cleanup (see SessionClipStore), superseding the audit's
     /// original delete-on-stop rule.
-    var onFinished: ((URL, Bool) -> Void)?
+    var onFinished: ((URL, SaveOutcome) -> Void)?
+    /// THE save-to-Photos gate (Capability.saveVideoToPhotos). Consulted
+    /// synchronously in stop() on the caller's (main) thread and latched for
+    /// this artifact; nil (tests without an AppModel) means allowed. The
+    /// recorder itself knows nothing about StoreKit — AppModel injects the
+    /// entitlement check.
+    var allowsSaveToPhotos: (() -> Bool)?
     /// Fires (any thread) when an unsupported codec config fell back to HEVC.
     var onFallbackNotice: ((String) -> Void)?
 
@@ -185,6 +198,10 @@ final class MoshRecorder: NSObject, ObservableObject,
         videoInput?.markAsFinished()
         audioInput?.markAsFinished()
         let url = writer.outputURL
+        // Entitlement checked ONCE here (main thread) and latched — a
+        // purchase completing mid-finalize doesn't change this artifact's
+        // outcome; the pending-save flow re-saves it explicitly.
+        let saveAllowed = allowsSaveToPhotos?() ?? true
         writer.finishWriting { [weak self] in
             do {
                 let audioSession = AVAudioSession.sharedInstance()
@@ -196,25 +213,58 @@ final class MoshRecorder: NSObject, ObservableObject,
             // The temp file is NOT deleted on any path anymore — it feeds the
             // session gallery (share / remosh / social export). Reclaimed by
             // gallery Delete, the launch sweep, or termination cleanup.
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-                guard status == .authorized || status == .limited else {
-                    DispatchQueue.main.async {
-                        self?.lastError = "Photos access denied"
-                        self?.onFinished?(url, false)
-                    }
-                    return
-                }
-                PHPhotoLibrary.shared().performChanges {
-                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
-                } completionHandler: { _, error in
-                    DispatchQueue.main.async {
-                        if let error { self?.lastError = error.localizedDescription }
-                        self?.onFinished?(url, error == nil)
-                    }
-                }
+            guard saveAllowed else {
+                // Free tier: the recording lives on in the session gallery;
+                // only the Photos write is intercepted (AppModel presents the
+                // upgrade sheet and keeps the save pending).
+                DispatchQueue.main.async { self?.onFinished?(url, .gated) }
+                return
+            }
+            VideoPhotosSaver.save(url) { saved, errorMessage in
+                if let errorMessage { self?.lastError = errorMessage }
+                self?.onFinished?(url, saved ? .saved : .failed)
             }
         }
         self.writer = nil; videoInput = nil; audioInput = nil; adaptor = nil
+    }
+}
+
+// MARK: - Video -> Photos library
+
+/// The one PHPhotoLibrary write path for video: used by MoshRecorder on stop
+/// (entitled users) and by AppModel's pending-save completion after a
+/// purchase/redeem. Same add-only authorization dance as SnapshotSaver.
+enum VideoPhotosSaver {
+    #if DEBUG
+    /// Test seam: when set, saves route here instead of the real Photos
+    /// library. Completion contract is identical: (saved, errorMessage).
+    static var debugSaveHook: ((URL, @escaping (Bool, String?) -> Void) -> Void)?
+    #endif
+
+    /// Saves the video file at `url` to Photos. `completion` fires on main
+    /// with (saved, errorMessage) — errorMessage is non-nil on denial/error.
+    static func save(_ url: URL, completion: @escaping (Bool, String?) -> Void) {
+        #if DEBUG
+        if let hook = debugSaveHook {
+            hook(url) { saved, message in
+                DispatchQueue.main.async { completion(saved, message) }
+            }
+            return
+        }
+        #endif
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else {
+                DispatchQueue.main.async { completion(false, "Photos access denied") }
+                return
+            }
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+            } completionHandler: { _, error in
+                DispatchQueue.main.async {
+                    completion(error == nil, error?.localizedDescription)
+                }
+            }
+        }
     }
 }
 

@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  StoreKit sandbox testing: the Run action references
+  MoshPit/Configuration/MoshPit.storekit so purchases work in Simulator and
+  on device with no App Store Connect account. For TestFlight/production
+  builds the configuration file is ignored and real App Store entitlements
+  are used automatically — no code changes needed between sandbox and
+  production. (StoreTests load the file directly via SKTestSession, so the
+  Test action needs no reference.)
+-->
 <Scheme
    LastUpgradeVersion = "2600"
    version = "1.7">
@@ -61,6 +70,9 @@
             ReferencedContainer = "container:MoshPit.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <StoreKitConfigurationFileReference
+         identifier = "../../../MoshPit/Configuration/MoshPit.storekit">
+      </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

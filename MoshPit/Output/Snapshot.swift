@@ -27,11 +27,25 @@ enum SnapshotSaver {
         return UIImage(cgImage: cg)
     }
 
+    #if DEBUG
+    /// Test seam: when set, saves route here (then onSaved) instead of the
+    /// real Photos library.
+    static var debugSaveHook: ((UIImage) -> Void)?
+    #endif
+
     /// Requests add-only Photos access if needed and saves. `onDenied` fires
     /// on main when access is (or becomes) denied; `onSaved` on success.
+    /// Deliberately entitlement-free: snapshot saving is NOT Pro-gated.
     static func save(_ image: UIImage,
                      onDenied: @escaping () -> Void,
                      onSaved: @escaping () -> Void) {
+        #if DEBUG
+        if let hook = debugSaveHook {
+            hook(image)
+            DispatchQueue.main.async { onSaved() }
+            return
+        }
+        #endif
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 DispatchQueue.main.async { onDenied() }
