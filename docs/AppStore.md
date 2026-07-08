@@ -78,8 +78,8 @@ deleted an I-frame on purpose.
 
 ## URLs
 
-- **Support URL:** `https://REPLACE-ME.example.com/moshpit/support` (placeholder — must be live before submission)
-- **Privacy Policy URL:** `https://REPLACE-ME.example.com/moshpit/privacy` (placeholder — host [PrivacyPolicy.md](PrivacyPolicy.md) here before submission)
+- **Support URL:** `https://goddamnimit.github.io/MoshPit/Support.html`
+- **Privacy Policy URL:** `https://goddamnimit.github.io/MoshPit/PrivacyPolicy.html`
 
 ## What's New in Version 1.0
 

@@ -70,5 +70,4 @@ updated and the change will be called out in the App Store release notes.
 
 ## Contact
 
-Questions? Email **privacy@REPLACE-ME.example.com** (placeholder — replace
-with a monitored address before publishing).
+Questions? Email **danflashllc@gmail.com**.
