@@ -4,7 +4,14 @@ import SwiftUI
 /// so it respects the overlay mutual-exclusivity system. No dark patterns:
 /// no timers, no fake urgency, no nagging — what's gated (only saving
 /// recordings to Photos), one price button with the localized price, Restore,
-/// a "Have a code?" disclosure, and a plain Not Now.
+/// and a plain Not Now.
+///
+/// v1 ships with NO redeem-code entry anywhere in the UI (App Store
+/// Guideline 3.1.1: license-key-style unlocks outside IAP are a rejection
+/// trigger). The RedeemCodes validation and ProManager.redeem(_:) plumbing
+/// remain in the codebase, deliberately unreachable; restore the UI from git
+/// history (RedeemCodeField, removed 2026-07-07) or adopt Apple Offer Codes
+/// if promotional unlocks are ever wanted.
 struct UpgradeSheet: View {
     @EnvironmentObject var app: AppModel
     @ObservedObject var pro = ProManager.shared
@@ -64,8 +71,6 @@ struct UpgradeSheet: View {
                 .frame(height: Theme.buttonStandard)
                 .disabled(busy)
 
-                RedeemCodeField()
-
                 Button("Not Now") { dismiss() }
                     .font(Theme.labelSmall)
                     .foregroundStyle(Theme.textSecondary)
@@ -114,67 +119,6 @@ struct UpgradeSheet: View {
                 .padding(.horizontal, Theme.g3)
         default:
             EmptyView()
-        }
-    }
-}
-
-// MARK: - Redeem code entry
-
-/// "Have a code?" disclosure -> text field + Redeem, with inline feedback.
-/// Shared by the UpgradeSheet and the Output sheet's Pro section. No shaming
-/// copy, no lockout — just a short debounce so rapid resubmission doesn't
-/// spam validation.
-struct RedeemCodeField: View {
-    var startsExpanded = false
-    @State private var expanded = false
-    @State private var code = ""
-    @State private var feedback: (message: String, success: Bool)?
-    @State private var debouncing = false
-
-    var body: some View {
-        VStack(spacing: Theme.g1) {
-            if expanded || startsExpanded {
-                HStack(spacing: Theme.g1) {
-                    TextField("MOSHPIT-XXXX-XXXX", text: $code)
-                        .font(Theme.mono)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .foregroundStyle(Theme.textPrimary)
-                        .padding(.horizontal, Theme.g1)
-                        .frame(height: Theme.buttonStandard)
-                        .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                            .stroke(Theme.stroke, lineWidth: 1))
-                        .onSubmit(redeem)
-                    Button("Redeem", action: redeem)
-                        .buttonStyle(MoshButtonStyle(size: .standard))
-                        .disabled(debouncing || code.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                if let feedback {
-                    Text(feedback.message)
-                        .font(Theme.labelSmall)
-                        .foregroundStyle(feedback.success ? Theme.accent : Theme.textSecondary)
-                }
-            } else {
-                Button("Have a code?") {
-                    withAnimation(Theme.fade) { expanded = true }
-                }
-                .font(Theme.labelSmall)
-                .foregroundStyle(Theme.textSecondary)
-                .frame(height: Theme.buttonSmall)
-            }
-        }
-    }
-
-    private func redeem() {
-        guard !debouncing else { return }
-        debouncing = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { debouncing = false }
-        if ProManager.shared.redeem(code) {
-            feedback = ("Unlocked!", true)
-            // ProManager publishes isPro; the sheet dismisses and any pending
-            // save completes via AppModel — same as a successful purchase.
-        } else {
-            feedback = ("That code isn't valid", false)
         }
     }
 }
