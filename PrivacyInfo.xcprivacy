@@ -9,7 +9,11 @@
 	     NSPrivacyAccessedAPITypes (doing so triggers ITMS-91056).
 	     The only required-reason API the app links against is UserDefaults,
 	     used for on-device app settings (effect order, MIDI CC bindings,
-	     tutorial-seen flag, photosensitivity-warning flag). -->
+	     tutorial-seen flag, photosensitivity-warning flag) and the local
+	     Pro-unlock state (StoreKit entitlement launch cache, offline
+	     redeem-code flag). StoreKit 2 itself (Transaction/Product/AppStore)
+	     is not a required-reason API and purchase data is collected and
+	     disclosed by Apple, not by this app. -->
 	<key>NSPrivacyTracking</key>
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>

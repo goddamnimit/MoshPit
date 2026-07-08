@@ -14,7 +14,7 @@ If the plain name is taken on App Store Connect, fall back to
 
 **Real-time datamosh instrument** (29 characters)
 
-## Description (limit 4000 characters — this copy is ~2,600)
+## Description (limit 4000 characters — this copy is ~2,700)
 
 MoshPit turns datamoshing — the melting, smearing glitch look born from
 broken video compression — into a live instrument. Point it at your camera,
@@ -60,12 +60,14 @@ completely different source. Full hardware-keyboard shortcuts on iPad.
 SEND IT TO THE BIG SCREEN
 Stream your output over the local network to VJ and streaming software via
 NDI, or from any browser via built-in MJPEG — no extra hardware. Record
-1080p video with mic audio straight to Photos, or grab a single frame with
-the shutter button.
+1080p video with mic audio — every clip lands in the session gallery for
+instant sharing — or grab a single frame with the shutter button.
 
 NO STRINGS
-No account. No ads. No analytics. Nothing leaves your device unless you
-point an output at your own network.
+No account. No ads. No analytics. No subscriptions. Nothing leaves your
+device unless you point an output at your own network. Every mode, effect,
+and output is free; the one optional purchase is MoshPit Pro, a single
+one-time unlock that saves your recordings directly to Photos.
 
 MoshPit is for VJs, video artists, glitch enthusiasts, and anyone who ever
 deleted an I-frame on purpose.
@@ -89,7 +91,32 @@ Initial release.
 - 3D point cloud, wireframe, and textured-object render paths
 - A/B source mixer with luma and mask wipes
 - MIDI CC learn, automation record/replay, hardware keyboard shortcuts
-- NDI and MJPEG network output; 1080p recording to Photos
+- NDI and MJPEG network output; 1080p recording, snapshots, session gallery
+- Optional one-time MoshPit Pro unlock: save recordings straight to Photos
+
+## In-App Purchases (must be created in App Store Connect)
+
+One product. It must exist in App Store Connect and be attached to the 1.0
+version before submission — a first IAP is reviewed together with the app
+version and cannot ship separately.
+
+| Field | Value |
+|---|---|
+| Type | Non-consumable |
+| Product ID | `com.moshpit.app.pro` (must match `ProManager.productID` exactly) |
+| Reference name | MoshPit Pro |
+| Display name (limit 30) | MoshPit Pro (11 characters) |
+| Description (limit 45) | Save your recorded videos to Photos. (37 characters) |
+| Price | USD 4.99 tier |
+
+Checklist:
+- Add at least the English (U.S.) localization above.
+- Upload the required IAP review screenshot (the in-app upgrade sheet).
+- Set the product to "Cleared for Sale".
+- On the version page, add the IAP under "In-App Purchases" so it is
+  submitted with the 1.0 review.
+- "Restore Purchases" is implemented in the upgrade sheet (App Review
+  requires a visible restore mechanism for non-consumables).
 
 ## Category & Rating Notes
 
