@@ -2,18 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Merged with the generated Info.plist (GENERATE_INFOPLIST_FILE=YES).
-	     NDI discovery uses Bonjour over the local network. -->
-	<!-- MoshPit implements no custom encryption; NDI's transport encryption is
-	     part of the OS-adjacent vendor SDK and exempt. Declaring this here
-	     skips the export-compliance question on every upload. -->
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_ndi._tcp.</string>
 	</array>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>MoshPit streams video to NDI receivers (Resolume, OBS, VDMX) and serves MJPEG over your local network.</string>
 </dict>
 </plist>
