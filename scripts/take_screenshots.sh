@@ -14,7 +14,7 @@ set -euo pipefail
 
 DEVICE_NAME="iPhone 15 Pro Max"
 DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro-Max"
-BUNDLE_ID="com.moshpit.app"
+BUNDLE_ID="com.nimit.datamosh"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$REPO_ROOT/docs/screenshots/appstore"
 DERIVED="$REPO_ROOT/build/screenshots-deriveddata"
