@@ -1,11 +1,10 @@
+---
+title: MoshPit Privacy Policy
+---
+
 # MoshPit Privacy Policy
 
 _Last updated: July 6, 2026_
-
-> **Hosting note (remove before publishing):** App Store Connect requires a
-> live privacy policy URL. Host this page anywhere public (GitHub Pages, your
-> own site) and enter that URL in App Store Connect and in
-> `docs/AppStore.md`.
 
 MoshPit is a real-time video effects app. The short version: **we collect
 nothing.**
@@ -39,16 +38,14 @@ protocol or a built-in MJPEG web stream. This only happens when you switch
 an output on, and the video goes only to devices on your own network that
 you point at the stream. MoshPit never connects to the internet on its own.
 
-## Purchases and redeem codes
+## Purchases
 
 MoshPit offers one optional one-time purchase ("MoshPit Pro", which unlocks
 saving recordings to Photos). Payment is handled entirely by Apple through
 your App Store account: MoshPit never sees your payment details and keeps no
 purchase records of its own — just a local "unlocked" flag on your device,
 backed by Apple's own receipt system. Data Apple processes for the purchase
-is covered by Apple's privacy policy, not ours. Promotional redeem codes are
-checked entirely on your device; entering one stores the same local flag and
-sends nothing anywhere.
+is covered by Apple's privacy policy, not ours.
 
 ## Third-party components
 
