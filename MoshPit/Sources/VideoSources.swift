@@ -99,7 +99,111 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
     private var reportedPlaying = false
 
     static func deviceAvailable(_ position: AVCaptureDevice.Position) -> Bool {
-        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) != nil
+        bestDevice(position) != nil
+    }
+
+    // MARK: Lens discovery + zoom
+
+    /// Back camera prefers the VIRTUAL multi-lens device so iOS crossfades
+    /// between constituent lenses internally as zoom crosses the switch-over
+    /// factors — never hard-cut between discrete AVCaptureDevice instances.
+    /// Front cameras are single-lens; plain wide angle is the whole story.
+    static func bestDevice(_ position: AVCaptureDevice.Position) -> AVCaptureDevice? {
+        let types: [AVCaptureDevice.DeviceType] = position == .back
+            ? [.builtInTripleCamera, .builtInDualWideCamera,
+               .builtInDualCamera, .builtInWideAngleCamera]
+            : [.builtInWideAngleCamera]
+        let discovered = AVCaptureDevice.DiscoverySession(
+            deviceTypes: types, mediaType: .video, position: position).devices
+        for type in types {
+            if let device = discovered.first(where: { $0.deviceType == type }) {
+                return device
+            }
+        }
+        return discovered.first
+    }
+
+    /// Digital-zoom cap in DISPLAY units (10x past the 1x lens, like stock);
+    /// maxAvailableVideoZoomFactor alone can report absurd values (100+).
+    private static let maxDisplayZoom: CGFloat = 10
+
+    private var activeDevice: AVCaptureDevice?
+    private var zoomObservation: NSKeyValueObservation?
+    /// videoZoomFactor that reads as "1x": on virtual devices that include
+    /// the ultra-wide, factor 1.0 is the ULTRA-WIDE, and the first switch-over
+    /// factor is where the wide lens takes over — that's the user's "1x".
+    private var displayScale: CGFloat = 1
+    /// Raw switch-over factors — crossing one swaps the physical lens.
+    private var lensSwitchFactors: [CGFloat] = []
+    /// Display-space tap targets for the lens pill, e.g. [0.5, 1, 2].
+    private(set) var zoomOptions: [CGFloat] = []
+    /// Fires with the display-space zoom whenever videoZoomFactor moves.
+    var onZoomChanged: ((CGFloat) -> Void)?
+    /// Current display-space zoom (1 = "1x").
+    var displayZoom: CGFloat {
+        guard let device = activeDevice else { return 1 }
+        return device.videoZoomFactor / displayScale
+    }
+    private var logFormatOnNextFrame = false
+
+    /// Adopt a freshly attached device: derive the display mapping, reset to
+    /// 1x (virtual devices boot at the widest lens = 0.5x otherwise; also the
+    /// sensible default after a flip, since front/back zoom ranges are
+    /// independent), and observe zoom for the UI.
+    private func adoptDevice(_ device: AVCaptureDevice) {
+        activeDevice = device
+        let switchOvers = device.virtualDeviceSwitchOverVideoZoomFactors
+            .map { CGFloat(truncating: $0) }
+        lensSwitchFactors = switchOvers
+        let hasUltraWide = device.constituentDevices
+            .contains { $0.deviceType == .builtInUltraWideCamera }
+        displayScale = hasUltraWide ? (switchOvers.first ?? 1) : 1
+        var options: [CGFloat] = []
+        if hasUltraWide {
+            options.append(device.minAvailableVideoZoomFactor / displayScale)
+        }
+        options.append(1)
+        for f in switchOvers.dropFirst(hasUltraWide ? 1 : 0) {
+            options.append(f / displayScale)
+        }
+        zoomOptions = options
+        if (try? device.lockForConfiguration()) != nil {
+            device.videoZoomFactor = min(
+                max(displayScale, device.minAvailableVideoZoomFactor),
+                device.maxAvailableVideoZoomFactor)
+            device.unlockForConfiguration()
+        }
+        zoomObservation = device.observe(\.videoZoomFactor,
+                                         options: [.initial, .new]) { [weak self] dev, _ in
+            guard let self else { return }
+            self.onZoomChanged?(dev.videoZoomFactor / self.displayScale)
+        }
+    }
+
+    /// Ramp to a display-space zoom (1 = "1x"), clamped to the device's
+    /// available range. Always ramps — never snaps videoZoomFactor — so both
+    /// pinch (fast rate chases the finger) and pill taps (slower rate, stock
+    /// animation feel) stay smooth.
+    func setZoom(display: CGFloat, rate: Float = 6) {
+        queue.async { [self] in
+            guard let device = activeDevice else { return }
+            let cap = min(device.maxAvailableVideoZoomFactor,
+                          displayScale * Self.maxDisplayZoom)
+            let target = min(max(display * displayScale,
+                                 device.minAvailableVideoZoomFactor), cap)
+            guard (try? device.lockForConfiguration()) != nil else { return }
+            // Crossing a switch-over factor swaps the physical lens inside
+            // the virtual device — arm the format log so a silent BGRA->YCbCr
+            // regression at a lens boundary is diagnosable on-device.
+            let current = device.videoZoomFactor
+            if lensSwitchFactors.contains(where: {
+                (current < $0) != (target < $0)
+            }) {
+                logFormatOnNextFrame = true
+            }
+            device.ramp(toVideoZoomFactor: target, withRate: rate)
+            device.unlockForConfiguration()
+        }
     }
 
     init(device: MTLDevice, position: AVCaptureDevice.Position) {
@@ -109,28 +213,30 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
         configure()
     }
 
+    /// Request BGRA so the capture pipeline does the YCbCr->BGRA conversion
+    /// in hardware — CameraSource then feeds the SAME format as PlayerSource
+    /// and one ingestor path serves both.
+    private static let bgraSettings =
+        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+
     private func configure() {
         session.beginConfiguration()
         session.sessionPreset = .hd1280x720
-        guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
+        guard let cam = Self.bestDevice(position),
               let input = try? AVCaptureDeviceInput(device: cam),
               session.canAddInput(input) else {
             session.commitConfiguration(); return
         }
         session.addInput(input)
-        // Request BGRA so the capture pipeline does the YCbCr->BGRA
-        // conversion in hardware — CameraSource then feeds the SAME format
-        // as PlayerSource and one ingestor path serves both.
-        let bgra = [kCVPixelBufferPixelFormatTypeKey as String:
-                        kCVPixelFormatType_32BGRA]
-        output.videoSettings = bgra                    // set BEFORE attach
+        adoptDevice(cam)
+        output.videoSettings = Self.bgraSettings       // set BEFORE attach
         output.alwaysDiscardsLateVideoFrames = true
         output.setSampleBufferDelegate(self, queue: queue)
         if session.canAddOutput(output) { session.addOutput(output) }
         // Some iOS versions revert videoSettings to the sensor-native
         // YCbCr biplanar format when the output attaches — re-assert inside
         // the same configuration transaction so BGRA actually sticks.
-        output.videoSettings = bgra
+        output.videoSettings = Self.bgraSettings
         applyConnectionSettings()
         session.commitConfiguration()
     }
@@ -155,8 +261,7 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
     func flip(completion: ((Bool) -> Void)? = nil) {
         queue.async { [self] in
             let newPosition: AVCaptureDevice.Position = position == .front ? .back : .front
-            guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera,
-                                                    for: .video, position: newPosition),
+            guard let cam = Self.bestDevice(newPosition),
                   let newInput = try? AVCaptureDeviceInput(device: cam) else {
                 completion?(false); return
             }
@@ -166,11 +271,17 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
             if session.canAddInput(newInput) {
                 session.addInput(newInput)
                 position = newPosition
+                adoptDevice(cam)   // remap zoom + reset to 1x for the new range
             } else {
                 oldInputs.forEach { if session.canAddInput($0) { session.addInput($0) } }
             }
+            // Swapping the input re-negotiates the output format on some iOS
+            // versions, silently reverting BGRA to sensor-native YCbCr —
+            // re-assert inside the transaction (same fix as configure()).
+            output.videoSettings = Self.bgraSettings
             applyConnectionSettings()
             session.commitConfiguration()
+            logFormatOnNextFrame = true
             completion?(position == newPosition)
         }
     }
@@ -248,6 +359,11 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
         if !loggedFirstFrame, latestTexture != nil {
             loggedFirstFrame = true
             print("CameraSource: first frame \(CVPixelBufferGetWidth(pb))x\(CVPixelBufferGetHeight(pb)) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb)))")
+        }
+        if logFormatOnNextFrame {
+            logFormatOnNextFrame = false
+            let zoom = activeDevice.map { $0.videoZoomFactor / displayScale } ?? 0
+            print("CameraSource: post-reconfig frame \(CVPixelBufferGetWidth(pb))x\(CVPixelBufferGetHeight(pb)) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb))) device=\(activeDevice?.localizedName ?? "?") zoom=\(String(format: "%.2f", zoom))x")
         }
         #endif
     }
@@ -569,6 +685,11 @@ final class SourceManager: ObservableObject {
     @Published private(set) var canFlipCamera = false
     /// Per-slot reverse playback state (PlayerSource slots only).
     @Published private(set) var reversed: [SourceSlot: Bool] = [:]
+    /// Lens pill state for the active camera (slot A wins, same rule as flip).
+    /// Empty options = no camera anywhere = pill hidden, pinch inert.
+    @Published private(set) var cameraZoomOptions: [CGFloat] = []
+    /// Current display-space zoom (1 = "1x"), tracks ramps live via KVO.
+    @Published private(set) var cameraZoom: CGFloat = 1
     private var sources: [SourceSlot: FrameSource] = [:]
     private let device: MTLDevice
     private let lock = NSLock()
@@ -611,7 +732,36 @@ final class SourceManager: ObservableObject {
                 self.lock.unlock()
                 if let slot { self.names[slot] = cam.displayName }
                 self.refreshFlipAvailability()
+                self.publishZoomState()
             }
+        }
+    }
+
+    /// Ramp the active camera to a display-space zoom. Pinch passes a fast
+    /// rate so the ramp chases the finger; pill taps use the default for the
+    /// stock-camera animated glide.
+    func setCameraZoom(_ display: CGFloat, rate: Float = 6) {
+        lock.lock()
+        let cam = flippableCamera()
+        lock.unlock()
+        cam?.setZoom(display: display, rate: rate)
+    }
+
+    private func publishZoomState() {
+        lock.lock()
+        let cam = flippableCamera()
+        lock.unlock()
+        let options = cam?.zoomOptions ?? []
+        cam?.onZoomChanged = { [weak self] zoom in
+            DispatchQueue.main.async {
+                guard let self, abs(zoom - self.cameraZoom) > 0.005 else { return }
+                self.cameraZoom = zoom
+            }
+        }
+        let zoom = cam?.displayZoom ?? 1
+        DispatchQueue.main.async {
+            self.cameraZoomOptions = options
+            self.cameraZoom = zoom
         }
     }
 
@@ -677,6 +827,7 @@ final class SourceManager: ObservableObject {
             self.reversed[slot] = nil
         }
         refreshFlipAvailability()
+        publishZoomState()
     }
 
     private func install(_ source: FrameSource, slot: SourceSlot) {
@@ -701,6 +852,7 @@ final class SourceManager: ObservableObject {
             self.reversed[slot] = nil          // fresh source plays forward
         }
         refreshFlipAvailability()
+        publishZoomState()
     }
 
     /// Backgrounding: pause capture but keep the canvas alive.

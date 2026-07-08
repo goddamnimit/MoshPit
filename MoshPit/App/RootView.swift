@@ -52,6 +52,15 @@ struct RootView: View {
                         .padding(.horizontal, Self.edgeZone)
                 }
 
+                // Camera pinch-to-zoom — mounted only when the pinch should
+                // control the lens: 3D orbit (which owns pinch in trace-3D)
+                // is off and no drawer/panel is up. With no live camera the
+                // zoom call is a no-op, so no camera check is needed here.
+                if !app.params.bool(.trace3D), app.activePanel == nil,
+                   !app.showCheatSheet, app.openDrawer == nil {
+                    CameraPinchLayer()
+                }
+
                 chromeBars
 
                 // Edge swipe zones (only while no drawer is open).
@@ -199,6 +208,9 @@ struct RootView: View {
                 .padding(.top, Theme.g1)
             Spacer()
             if !app.performanceMode {
+                ZoomPillView()
+                    .padding(.bottom, Theme.g1)
+                    .transition(.opacity)
                 MainControlRow(recordStart: $recordStart)
                     .padding(.bottom, Theme.g1)
                     .transition(.opacity)
