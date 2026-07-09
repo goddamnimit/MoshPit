@@ -589,7 +589,6 @@ private struct TopStrip: View {
                 app.previewFill.toggle()
             }
             .accessibilityLabel(app.previewFill ? "Fit preview" : "Fill preview")
-            FlipCameraButton()
             IconButton(systemName: "questionmark",
                        selected: app.showCheatSheet) {
                 app.showCheatSheet.toggle()
@@ -600,17 +599,23 @@ private struct TopStrip: View {
 
 /// Camera flip — standard camera-app pattern. Disabled (40%) when no slot
 /// holds a camera or the opposite device doesn't exist (e.g. simulator).
+/// Lives in the bottom control row, left of Record — same standard tier
+/// as the bloom/snapshot buttons.
 private struct FlipCameraButton: View {
     @EnvironmentObject var app: AppModel
     @ObservedObject var ticker = RefreshTicker.shared
 
     var body: some View {
         let enabled = app.sources?.canFlipCamera == true
-        IconButton(systemName: "arrow.triangle.2.circlepath.camera") {
+        Button {
             guard enabled else { return }
             Theme.haptic()
             app.flipCamera()
+        } label: {
+            Image(systemName: "arrow.triangle.2.circlepath.camera")
+                .frame(width: Theme.buttonStandard - Theme.g2)
         }
+        .buttonStyle(MoshButtonStyle(size: .standard))
         .opacity(enabled ? 1 : Theme.disabledOpacity)
         .disabled(!enabled)
         .accessibilityLabel("Flip camera")
@@ -683,6 +688,7 @@ private struct MainControlRow: View {
     var body: some View {
         HStack(spacing: Theme.g3) {
             HoldResetButton().coachAnchor(.resetButton)
+            FlipCameraButton()
             RecordButton(recordStart: $recordStart).coachAnchor(.recordButton)
 
             Button {
