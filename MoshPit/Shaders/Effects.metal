@@ -299,3 +299,18 @@ fragment float4 previewFragment(QuadOut in [[stage_in]],
     if (any(in.uv < 0.0) || any(in.uv > 1.0)) return float4(0, 0, 0, 1); // letterbox
     return float4(tex.sample(s, in.uv).rgb, 1.0);
 }
+
+// Targeted GPU-side rotation for camera frames when physical rotation fails.
+// Rotates 90 degrees clockwise and handles front-camera mirroring.
+kernel void cameraRotate(texture2d<float, access::sample> input  [[texture(0)]],
+                         texture2d<float, access::write>  output [[texture(1)]],
+                         constant int& mirror                    [[buffer(0)]],
+                         uint2 gid [[thread_position_in_grid]]) {
+    if (gid.x >= output.get_width() || gid.y >= output.get_height()) return;
+    
+    float2 uv = (float2(gid) + 0.5) / float2(output.get_width(), output.get_height());
+    float2 rotUV = mirror ? float2(1.0 - uv.y, uv.x) : float2(uv.y, 1.0 - uv.x);
+    
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    output.write(float4(input.sample(s, rotUV).rgb, 1.0), gid);
+}

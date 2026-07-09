@@ -98,6 +98,13 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
     var onStatus: ((SourceStatus) -> Void)?
     private var reportedPlaying = false
 
+    private let device: MTLDevice
+    private var commandQueue: MTLCommandQueue?
+    private var rotatePipeline: MTLComputePipelineState?
+    private var rotatedTextures: [MTLTexture] = []
+    private var rotatePoolIndex = 0
+    private static let rotationPoolSize = 3
+
     static func deviceAvailable(_ position: AVCaptureDevice.Position) -> Bool {
         bestDevice(position) != nil
     }
@@ -207,8 +214,19 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
     }
 
     init(device: MTLDevice, position: AVCaptureDevice.Position) {
+        self.device = device
         self.position = position
         self.ingestor = TextureIngestor(device: device)
+        self.commandQueue = device.makeCommandQueue()
+        if let library = device.makeDefaultLibrary(),
+           let fn = library.makeFunction(name: "cameraRotate") {
+            self.rotatePipeline = try? device.makeComputePipelineState(function: fn)
+        }
+        #if DEBUG
+        if self.rotatePipeline == nil {
+            print("CameraSource [ERROR]: cameraRotate pipeline state compilation failed!")
+        }
+        #endif
         super.init()
         configure()
     }
@@ -368,32 +386,108 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
             warmupRemaining = 0
         }
         ingestor.flush()   // per-frame: drop stale IOSurface mappings (device)
-        latestTexture = ingestor.texture(from: pb)
-        if let tex = latestTexture {
-            if !reportedPlaying {
-                reportedPlaying = true
-                onStatus?(.playing(tex.width, tex.height))
+        let rawTexture = ingestor.texture(from: pb)
+        if let raw = rawTexture {
+            let isLandscape = raw.width > raw.height
+            let needsRotation = isLandscape && connection.videoRotationAngle == 90.0
+            
+            if needsRotation, let pipeline = rotatePipeline, let queue = commandQueue {
+                let targetW = raw.height
+                let targetH = raw.width
+                
+                let needsRealloc = rotatedTextures.isEmpty || 
+                                   rotatedTextures[0].width != targetW || 
+                                   rotatedTextures[0].height != targetH ||
+                                   rotatedTextures[0].pixelFormat != raw.pixelFormat
+                
+                if needsRealloc {
+                    rotatedTextures.removeAll()
+                    let desc = MTLTextureDescriptor.texture2DDescriptor(
+                        pixelFormat: raw.pixelFormat, width: targetW, height: targetH, mipmapped: false)
+                    desc.usage = [.shaderRead, .shaderWrite]
+                    desc.storageMode = .private
+                    for i in 0..<Self.rotationPoolSize {
+                        if let tex = device.makeTexture(descriptor: desc) {
+                            tex.label = "camera.rotated.\(i)"
+                            rotatedTextures.append(tex)
+                        }
+                    }
+                }
+                
+                if !rotatedTextures.isEmpty {
+                    let dst = rotatedTextures[rotatePoolIndex]
+                    rotatePoolIndex = (rotatePoolIndex + 1) % rotatedTextures.count
+                    
+                    if let cb = queue.makeCommandBuffer() {
+                        cb.label = "camera.rotate"
+                        if let enc = cb.makeComputeCommandEncoder() {
+                            enc.label = "cameraRotate"
+                            enc.setComputePipelineState(pipeline)
+                            enc.setTexture(raw, index: 0)
+                            enc.setTexture(dst, index: 1)
+                            var mirrorVal: Int32 = (position == .front) ? 1 : 0
+                            enc.setBytes(&mirrorVal, length: MemoryLayout<Int32>.size, index: 0)
+                            
+                            let tg = MTLSize(width: 16, height: 16, depth: 1)
+                            let grid = MTLSize(width: (dst.width + 15) / 16, height: (dst.height + 15) / 16, depth: 1)
+                            enc.dispatchThreadgroups(grid, threadsPerThreadgroup: tg)
+                            enc.endEncoding()
+                        }
+                        cb.addCompletedHandler { [weak self] _ in
+                            guard let self else { return }
+                            self.queue.async {
+                                self.latestTexture = dst
+                                if !self.reportedPlaying {
+                                    self.reportedPlaying = true
+                                    self.onStatus?(.playing(dst.width, dst.height))
+                                }
+                                #if DEBUG
+                                if !self.loggedFirstFrame {
+                                    self.loggedFirstFrame = true
+                                    let pbW = CVPixelBufferGetWidth(pb)
+                                    let pbH = CVPixelBufferGetHeight(pb)
+                                    let angle = connection.videoRotationAngle
+                                    print("CameraSource: first frame pb=\(pbW)x\(pbH), tex=\(dst.width)x\(dst.height), rotation=\(angle) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb)))")
+                                }
+                                if self.logFormatOnNextFrame {
+                                    self.logFormatOnNextFrame = false
+                                    let pbW = CVPixelBufferGetWidth(pb)
+                                    let pbH = CVPixelBufferGetHeight(pb)
+                                    let angle = connection.videoRotationAngle
+                                    let zoom = self.activeDevice.map { $0.videoZoomFactor / self.displayScale } ?? 0
+                                    print("CameraSource: post-reconfig frame pb=\(pbW)x\(pbH), rotation=\(angle) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb))) device=\(self.activeDevice?.localizedName ?? "?") zoom=\(String(format: "%.2f", zoom))x")
+                                }
+                                #endif
+                            }
+                        }
+                        cb.commit()
+                    }
+                }
+            } else {
+                latestTexture = raw
+                if !reportedPlaying {
+                    reportedPlaying = true
+                    onStatus?(.playing(raw.width, raw.height))
+                }
+                #if DEBUG
+                if !loggedFirstFrame {
+                    loggedFirstFrame = true
+                    let pbW = CVPixelBufferGetWidth(pb)
+                    let pbH = CVPixelBufferGetHeight(pb)
+                    let angle = connection.videoRotationAngle
+                    print("CameraSource: first frame pb=\(pbW)x\(pbH), tex=\(raw.width)x\(raw.height), rotation=\(angle) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb)))")
+                }
+                if logFormatOnNextFrame {
+                    logFormatOnNextFrame = false
+                    let pbW = CVPixelBufferGetWidth(pb)
+                    let pbH = CVPixelBufferGetHeight(pb)
+                    let angle = connection.videoRotationAngle
+                    let zoom = activeDevice.map { $0.videoZoomFactor / displayScale } ?? 0
+                    print("CameraSource: post-reconfig frame pb=\(pbW)x\(pbH), rotation=\(angle) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb))) device=\(activeDevice?.localizedName ?? "?") zoom=\(String(format: "%.2f", zoom))x")
+                }
+                #endif
             }
         }
-        #if DEBUG
-        if !loggedFirstFrame, let tex = latestTexture {
-            loggedFirstFrame = true
-            let pbW = CVPixelBufferGetWidth(pb)
-            let pbH = CVPixelBufferGetHeight(pb)
-            let texW = tex.width
-            let texH = tex.height
-            let angle = connection.videoRotationAngle
-            print("CameraSource: first frame pb=\(pbW)x\(pbH), tex=\(texW)x\(texH), rotation=\(angle) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb)))")
-        }
-        if logFormatOnNextFrame {
-            logFormatOnNextFrame = false
-            let pbW = CVPixelBufferGetWidth(pb)
-            let pbH = CVPixelBufferGetHeight(pb)
-            let angle = connection.videoRotationAngle
-            let zoom = activeDevice.map { $0.videoZoomFactor / displayScale } ?? 0
-            print("CameraSource: post-reconfig frame pb=\(pbW)x\(pbH), rotation=\(angle) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb))) device=\(activeDevice?.localizedName ?? "?") zoom=\(String(format: "%.2f", zoom))x")
-        }
-        #endif
     }
 }
 
