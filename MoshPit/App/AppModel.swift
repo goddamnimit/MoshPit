@@ -150,7 +150,10 @@ final class AppModel: ObservableObject {
             { [weak ndi] tex, t in ndi?.consume(texture: tex, time: t) },
         ]
         renderer.previewFill = previewFill   // sync default (fill) explicitly
-        renderer.onStats = { [weak self] s in self?.stats = s }
+        renderer.onStats = { [weak self] s in
+            Perf.event("statsPublish")
+            self?.stats = s
+        }
         renderer.modTap = { [weak self] s in self?.modMatrix.apply(stats: s) }
 
         // THE ONE PRO GATE (Capability.saveVideoToPhotos): consulted at
@@ -343,6 +346,7 @@ final class AppModel: ObservableObject {
     private static let overlaySwap: TimeInterval = 0.35   // drawer spring + beat
 
     func openSheet(_ panel: Panel) {
+        Perf.event("openSheet", panel.rawValue)
         showCheatSheet = false
         showDemoSheet = false
         guard activePanel != panel else { return }
@@ -361,6 +365,7 @@ final class AppModel: ObservableObject {
     }
 
     func openDrawer(_ side: DrawerSide?) {
+        Perf.event("openDrawer", side.map { "\($0)" } ?? "close")
         let hadSheet = activePanel != nil || showCheatSheet || showDemoSheet
         activePanel = nil
         showCheatSheet = false

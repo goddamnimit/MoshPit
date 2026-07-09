@@ -249,6 +249,7 @@ final class ParameterStore: ObservableObject {
         values[id] = value
         os_unfair_lock_unlock(&lock)
         guard old != value else { return }
+        Perf.event("paramSet", "\(id.rawValue) \(origin.rawValue)")
         let change = ParameterChange(id: id, value: value, origin: origin)
         if Thread.isMainThread {
             objectWillChange.send(); changes.send(change)

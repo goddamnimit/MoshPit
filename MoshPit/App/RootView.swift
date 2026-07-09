@@ -1,5 +1,6 @@
 import SwiftUI
 import MetalKit
+import os
 
 // MARK: - Root: fullscreen canvas + edge drawers
 
@@ -843,6 +844,7 @@ struct ParamRow: View {
 
     @State private var dragStartValue: Float?
     @State private var fineFactor: Float = 1
+    @State private var dragSignpost: OSSignpostIntervalState?
 
     /// Screenshot hook (-dragdemo): presents one row in its mid-drag state.
     private var demoDrag: Bool {
@@ -910,6 +912,7 @@ struct ParamRow: View {
             .gesture(DragGesture(minimumDistance: Theme.gHalf)
                 .onChanged { g in
                     if dragStartValue == nil {
+                        dragSignpost = Perf.begin("paramRowDrag")
                         dragStartValue = app.params.getNormalized(id)
                         if app.highlightParam == id { app.highlightParam = nil }
                     }
@@ -927,7 +930,10 @@ struct ParamRow: View {
                         app.params.setNormalized(id, n, origin: .ui)
                     }
                 }
-                .onEnded { _ in dragStartValue = nil; fineFactor = 1 })
+                .onEnded { _ in
+                    if let s = dragSignpost { Perf.end("paramRowDrag", s); dragSignpost = nil }
+                    dragStartValue = nil; fineFactor = 1
+                })
         }
         .frame(height: Theme.buttonStandard)
     }
