@@ -376,14 +376,22 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
             }
         }
         #if DEBUG
-        if !loggedFirstFrame, latestTexture != nil {
+        if !loggedFirstFrame, let tex = latestTexture {
             loggedFirstFrame = true
-            print("CameraSource: first frame \(CVPixelBufferGetWidth(pb))x\(CVPixelBufferGetHeight(pb)) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb)))")
+            let pbW = CVPixelBufferGetWidth(pb)
+            let pbH = CVPixelBufferGetHeight(pb)
+            let texW = tex.width
+            let texH = tex.height
+            let angle = connection.videoRotationAngle
+            print("CameraSource: first frame pb=\(pbW)x\(pbH), tex=\(texW)x\(texH), rotation=\(angle) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb)))")
         }
         if logFormatOnNextFrame {
             logFormatOnNextFrame = false
+            let pbW = CVPixelBufferGetWidth(pb)
+            let pbH = CVPixelBufferGetHeight(pb)
+            let angle = connection.videoRotationAngle
             let zoom = activeDevice.map { $0.videoZoomFactor / displayScale } ?? 0
-            print("CameraSource: post-reconfig frame \(CVPixelBufferGetWidth(pb))x\(CVPixelBufferGetHeight(pb)) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb))) device=\(activeDevice?.localizedName ?? "?") zoom=\(String(format: "%.2f", zoom))x")
+            print("CameraSource: post-reconfig frame pb=\(pbW)x\(pbH), rotation=\(angle) format=\(fourcc(CVPixelBufferGetPixelFormatType(pb))) device=\(activeDevice?.localizedName ?? "?") zoom=\(String(format: "%.2f", zoom))x")
         }
         #endif
     }
