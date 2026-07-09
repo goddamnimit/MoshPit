@@ -309,7 +309,7 @@ kernel void cameraRotate(texture2d<float, access::sample> input  [[texture(0)]],
     if (gid.x >= output.get_width() || gid.y >= output.get_height()) return;
     
     float2 uv = (float2(gid) + 0.5) / float2(output.get_width(), output.get_height());
-    float2 rotUV = mirror ? float2(1.0 - uv.y, uv.x) : float2(uv.y, 1.0 - uv.x);
+    float2 rotUV = mirror ? float2(uv.y, 1.0 - uv.x) : float2(1.0 - uv.y, uv.x);
     
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     output.write(float4(input.sample(s, rotUV).rgb, 1.0), gid);
