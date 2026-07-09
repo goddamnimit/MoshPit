@@ -253,8 +253,15 @@ final class AppModel: ObservableObject {
     private func entitled(_ capability: Capability) -> Bool {
         #if DEBUG
         if let debugProOverride { return debugProOverride }
-        #endif
+        // DEBUG-only: bypasses the save-to-Photos paywall for local
+        // development — every capability reads as unlocked, so the
+        // UpgradeSheet never presents. Not present in Release builds
+        // (App Store/TestFlight keep the full gate). Tests pin the gate
+        // explicitly via debugSetPro(_:), which takes precedence above.
+        return true
+        #else
         return MainActor.assumeIsolated { ProManager.shared.allows(capability) }
+        #endif
     }
 
     /// React to entitlement flips: dismiss the sheet and complete the

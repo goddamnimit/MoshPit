@@ -31,9 +31,18 @@ enum ShareSheetPresenter {
             // Pro gate (Capability.saveVideoToPhotos), so it is excluded for
             // video files while un-entitled. Snapshots (images) are never
             // affected: photo saving is not gated.
+            #if DEBUG
+            // DEBUG-only: bypasses the save-to-Photos paywall for local
+            // development — the share sheet keeps its built-in "Save Video"
+            // action regardless of entitlement. Not present in Release
+            // builds; the policy helper below stays fully gated and
+            // unit-tested.
+            activity.excludedActivityTypes = nil
+            #else
             activity.excludedActivityTypes = MainActor.assumeIsolated {
                 excludedActivityTypes(for: fileURL, isPro: ProManager.shared.isPro)
             }
+            #endif
             // iPad idiom: anchor the popover defensively even though iPhone
             // portrait is the primary target.
             if let pop = activity.popoverPresentationController {
