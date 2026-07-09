@@ -48,8 +48,18 @@ enum Theme {
     /// Overlay controls fade after this many seconds without interaction.
     static let idleTimeout: TimeInterval = 4
 
+    /// One shared generator, prepared ahead of use: allocating a fresh
+    /// UIImpactFeedbackGenerator per tap spins up the Taptic Engine on the
+    /// first impact, adding perceptible latency to the tap it accompanies.
+    private static let impactGenerator: UIImpactFeedbackGenerator = {
+        let g = UIImpactFeedbackGenerator(style: .light)
+        g.prepare()
+        return g
+    }()
+
     static func haptic() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        impactGenerator.impactOccurred()
+        impactGenerator.prepare()   // keep the engine warm for the next tap
     }
 }
 
