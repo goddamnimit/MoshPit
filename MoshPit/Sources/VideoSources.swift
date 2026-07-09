@@ -219,6 +219,16 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
     private static let bgraSettings =
         [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
 
+    private func logConnectionSettings(label: String) {
+        guard let conn = output.connection(with: .video) else {
+            print("CameraSource [\(label)]: No video connection found")
+            return
+        }
+        let angle = conn.videoRotationAngle
+        let supported = conn.isVideoRotationAngleSupported(90)
+        print("CameraSource [\(label)]: videoRotationAngle = \(angle) (supported = \(supported))")
+    }
+
     private func configure() {
         session.beginConfiguration()
         session.sessionPreset = .hd1280x720
@@ -238,7 +248,11 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
         // the same configuration transaction so BGRA actually sticks.
         output.videoSettings = Self.bgraSettings
         applyConnectionSettings()
+        logConnectionSettings(label: "before commitConfiguration")
         session.commitConfiguration()
+        logConnectionSettings(label: "after commitConfiguration")
+        applyConnectionSettings()
+        logConnectionSettings(label: "after re-assert")
     }
 
     /// Rotation + mirroring for the CURRENT position. Front frames are
@@ -247,7 +261,9 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
     /// consistent with what's on screen across flips.
     private func applyConnectionSettings() {
         guard let conn = output.connection(with: .video) else { return }
-        conn.videoRotationAngle = 90 // portrait-up frames
+        if conn.isVideoRotationAngleSupported(90) {
+            conn.videoRotationAngle = 90 // portrait-up frames
+        }
         if conn.isVideoMirroringSupported {
             conn.automaticallyAdjustsVideoMirroring = false
             conn.isVideoMirrored = (position == .front)
@@ -280,7 +296,11 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
             // re-assert inside the transaction (same fix as configure()).
             output.videoSettings = Self.bgraSettings
             applyConnectionSettings()
+            logConnectionSettings(label: "flip before commitConfiguration")
             session.commitConfiguration()
+            logConnectionSettings(label: "flip after commitConfiguration")
+            applyConnectionSettings()
+            logConnectionSettings(label: "flip after re-assert")
             logFormatOnNextFrame = true
             completion?(position == newPosition)
         }
