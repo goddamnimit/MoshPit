@@ -8,6 +8,7 @@ struct MoshPitApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(app)
+                .environmentObject(app.params)
                 .preferredColorScheme(.dark)
                 .statusBarHidden(true)
         }

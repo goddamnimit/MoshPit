@@ -790,6 +790,7 @@ struct BroadcastPickerView: UIViewRepresentable {
 
 struct PanelSlider: View {
     @EnvironmentObject var app: AppModel
+    @EnvironmentObject var params: ParameterStore
     let id: ParameterID
     let label: String
     var steps: [String]? = nil
@@ -800,16 +801,16 @@ struct PanelSlider: View {
                 .frame(width: Theme.g6 + Theme.g3, alignment: .leading)
                 .onLongPressGesture { app.midi.learnTarget = id }
             Slider(value: Binding(
-                get: { app.params.get(id) },
-                set: { app.params.set(id, steps != nil ? $0.rounded() : $0, origin: .ui) }),
+                get: { params.get(id) },
+                set: { params.set(id, steps != nil ? $0.rounded() : $0, origin: .ui) }),
                 in: id.range)
                 .tint(Theme.accent)
             if let steps {
-                Text(steps[min(steps.count - 1, max(0, Int(app.params.get(id))))])
+                Text(steps[min(steps.count - 1, max(0, Int(params.get(id))))])
                     .font(Theme.monoSmall).monospacedDigit().foregroundStyle(Theme.textPrimary)
                     .frame(width: Theme.g6, alignment: .trailing)
             } else {
-                Text(String(format: "%5.2f", app.params.get(id)))
+                Text(String(format: "%5.2f", params.get(id)))
                     .font(Theme.monoSmall).monospacedDigit().foregroundStyle(Theme.textPrimary)
                     .frame(width: Theme.g6, alignment: .trailing)
             }

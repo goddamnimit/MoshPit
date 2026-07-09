@@ -473,11 +473,12 @@ private struct RightDrawer: View {
 /// ParamRow widget, same ParameterIDs — bindings unchanged by the move.
 struct ModeParamList: View {
     @EnvironmentObject var app: AppModel
+    @EnvironmentObject var params: ParameterStore
     var compact = false
 
     private var rows: [(ParameterID, String, [String]?)] {
         var r: [(ParameterID, String, [String]?)]
-        switch app.params.mode {
+        switch params.mode {
         case .clean:
             return []
         case .classicSmear, .drift, .crossMosh:
@@ -837,6 +838,9 @@ struct PressScaleStyle: ButtonStyle {
 /// name surfaces while the row is being dragged.
 struct ParamRow: View {
     @EnvironmentObject var app: AppModel
+    // Direct store observation: drag feedback re-renders ONLY ParamRows
+    // (params.objectWillChange), not the whole AppModel-observing tree.
+    @EnvironmentObject var params: ParameterStore
     let id: ParameterID
     let label: String
     var steps: [String]? = nil
@@ -864,7 +868,7 @@ struct ParamRow: View {
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
-            let fraction = ParamRow.fraction(normalizedValue: app.params.getNormalized(id))
+            let fraction = ParamRow.fraction(normalizedValue: params.getNormalized(id))
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
                     .fill(Theme.scrimBase.opacity(0.4))
@@ -907,13 +911,13 @@ struct ParamRow: View {
             .contentShape(Rectangle())
             .onTapGesture(count: 2) {
                 Theme.haptic()
-                app.params.set(id, id.defaultValue, origin: .ui)
+                params.set(id, id.defaultValue, origin: .ui)
             }
             .gesture(DragGesture(minimumDistance: Theme.gHalf)
                 .onChanged { g in
                     if dragStartValue == nil {
                         dragSignpost = Perf.begin("paramRowDrag")
-                        dragStartValue = app.params.getNormalized(id)
+                        dragStartValue = params.getNormalized(id)
                         if app.highlightParam == id { app.highlightParam = nil }
                     }
                     // Fine-adjust: vertical distance from touch-down damps
@@ -925,9 +929,9 @@ struct ParamRow: View {
                     if steps != nil {
                         let r = id.range
                         let value = (r.lowerBound + n * (r.upperBound - r.lowerBound)).rounded()
-                        app.params.set(id, value, origin: .ui)
+                        params.set(id, value, origin: .ui)
                     } else {
-                        app.params.setNormalized(id, n, origin: .ui)
+                        params.setNormalized(id, n, origin: .ui)
                     }
                 }
                 .onEnded { _ in
@@ -940,9 +944,9 @@ struct ParamRow: View {
 
     private var valueText: String {
         if let steps {
-            return steps[min(steps.count - 1, max(0, Int(app.params.get(id))))]
+            return steps[min(steps.count - 1, max(0, Int(params.get(id))))]
         }
-        return String(format: compact ? "%4.2f" : "%5.2f", app.params.get(id))
+        return String(format: compact ? "%4.2f" : "%5.2f", params.get(id))
     }
 }
 
@@ -950,6 +954,7 @@ struct ParamRow: View {
 
 struct XYPad: View {
     @EnvironmentObject var app: AppModel
+    @EnvironmentObject var params: ParameterStore
     @State private var knob: CGPoint = .init(x: 0.5, y: 0.5)
 
     var body: some View {
@@ -994,11 +999,11 @@ struct XYPad: View {
                     apply(Float(x), Float(y))
                 }
                 .onEnded { _ in
-                    if app.params.mode == .drift || app.params.mode == .classicSmear {
+                    if params.mode == .drift || params.mode == .classicSmear {
                         // Spring back: drift is a momentary push.
                         withAnimation(.easeOut(duration: 0.15)) { knob = .init(x: 0.5, y: 0.5) }
-                        app.params.set(.driftX, 0, origin: .ui)
-                        app.params.set(.driftY, 0, origin: .ui)
+                        params.set(.driftX, 0, origin: .ui)
+                        params.set(.driftY, 0, origin: .ui)
                     }
                 })
         }
@@ -1006,7 +1011,7 @@ struct XYPad: View {
     }
 
     private var axisLabels: (x: String, y: String) {
-        switch app.params.mode {
+        switch params.mode {
         case .bloom: return ("THRESH →", "RATE →")
         case .timedBloom: return ("ANGLE / BIAS", "")
         case .feedback: return ("OFFSET X →", "OFFSET Y →")
@@ -1016,23 +1021,23 @@ struct XYPad: View {
     }
 
     private func apply(_ x: Float, _ y: Float) {
-        switch app.params.mode {
+        switch params.mode {
         case .bloom:
-            app.params.setNormalized(.bloomThreshold, x, origin: .ui)
-            app.params.setNormalized(.bloomRate, 1 - y, origin: .ui)
+            params.setNormalized(.bloomThreshold, x, origin: .ui)
+            params.setNormalized(.bloomRate, 1 - y, origin: .ui)
         case .timedBloom:
-            app.params.set(.bloomAngle, atan2(y - 0.5, x - 0.5) + .pi, origin: .ui)
-            app.params.setNormalized(.bloomBias,
+            params.set(.bloomAngle, atan2(y - 0.5, x - 0.5) + .pi, origin: .ui)
+            params.setNormalized(.bloomBias,
                 min(1, 2 * hypot(x - 0.5, y - 0.5)), origin: .ui)
         case .feedback:
-            app.params.setNormalized(.feedbackX, x, origin: .ui)
-            app.params.setNormalized(.feedbackY, y, origin: .ui)
+            params.setNormalized(.feedbackX, x, origin: .ui)
+            params.setNormalized(.feedbackY, y, origin: .ui)
         case .mixMosh:
-            app.params.setNormalized(.mixAmount, x, origin: .ui)
-            app.params.setNormalized(.motionGain, 1 - y, origin: .ui)
+            params.setNormalized(.mixAmount, x, origin: .ui)
+            params.setNormalized(.motionGain, 1 - y, origin: .ui)
         default:
-            app.params.set(.driftX, (x - 0.5) * 2, origin: .ui)
-            app.params.set(.driftY, (y - 0.5) * 2, origin: .ui)
+            params.set(.driftX, (x - 0.5) * 2, origin: .ui)
+            params.set(.driftY, (y - 0.5) * 2, origin: .ui)
         }
     }
 }

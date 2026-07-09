@@ -94,6 +94,8 @@ final class AppModel: ObservableObject {
     }
 
     private var cancellables = Set<AnyCancellable>()
+    /// Last time `stats` was published (main thread only) — see onStats.
+    private var lastStatsPublish: CFTimeInterval = 0
     private let effectOrderKey = "moshpit.effectOrder"
     /// One temp sweep per process — a second AppModel (tests) must not
     /// reclaim files the first instance's session still references.
@@ -150,9 +152,16 @@ final class AppModel: ObservableObject {
             { [weak ndi] tex, t in ndi?.consume(texture: tex, time: t) },
         ]
         renderer.previewFill = previewFill   // sync default (fill) explicitly
+        // Publishing `stats` invalidates EVERY view observing AppModel, so a
+        // per-frame (60 Hz) publish keeps the whole SwiftUI tree diffing
+        // constantly and starves touch handling. 10 Hz is plenty for the HUD.
         renderer.onStats = { [weak self] s in
+            guard let self else { return }
+            let now = CACurrentMediaTime()
+            guard now - self.lastStatsPublish >= 0.1 else { return }
+            self.lastStatsPublish = now
             Perf.event("statsPublish")
-            self?.stats = s
+            self.stats = s
         }
         renderer.modTap = { [weak self] s in self?.modMatrix.apply(stats: s) }
 
