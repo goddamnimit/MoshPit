@@ -267,6 +267,9 @@ struct EffectsPanel: View {
             }
             mirrorSection
             colorSection
+            gridWarpSection
+            spreadsheetSection
+            trackingHUDSection
         }
         .environment(\.editMode, .constant(.active))
     }
@@ -310,6 +313,59 @@ struct EffectsPanel: View {
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             default:
                 EmptyView()
+            }
+        }
+    }
+
+    /// Post-chain grid-mesh warp (finisher pass): recorded/NDI/MJPEG too.
+    @ViewBuilder private var gridWarpSection: some View {
+        Section("Grid-Mesh Glitch Warp (after chain — recorded too)") {
+            Toggle("Grid-Mesh Glitch Warp", isOn: Binding(
+                get: { app.params.bool(.gridWarpEnabled) },
+                set: { app.params.set(.gridWarpEnabled, $0 ? 1 : 0, origin: .ui) }))
+            if app.params.bool(.gridWarpEnabled) {
+                ParamRow(id: .gridWarpCellSize, label: "Cells")
+                ParamRow(id: .gridWarpIntensity, label: "Warp")
+                ParamRow(id: .gridWarpLineOpacity, label: "Mesh")
+                ParamRow(id: .gridWarpAnimSpeed, label: "Speed")
+                Text("Route an LFO to gridWarpAnimSpeed in Control for a pulsing warp.")
+                    .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+
+    /// Post-chain spreadsheet mosaic (finisher pass): recorded/NDI/MJPEG too.
+    @ViewBuilder private var spreadsheetSection: some View {
+        Section("Spreadsheet Mosh Filter (after chain — recorded too)") {
+            Toggle("Spreadsheet Mosh Filter", isOn: Binding(
+                get: { app.params.bool(.spreadsheetEnabled) },
+                set: { app.params.set(.spreadsheetEnabled, $0 ? 1 : 0, origin: .ui) }))
+            if app.params.bool(.spreadsheetEnabled) {
+                ParamRow(id: .spreadsheetCellSize, label: "Cols")
+                ParamRow(id: .spreadsheetChromeOpacity, label: "Chrome")
+                ParamRow(id: .spreadsheetGridLineOpacity, label: "Lines")
+                ParamRow(id: .spreadsheetSelectionSpeed, label: "Cursor")
+                ParamRow(id: .spreadsheetCellRevealMode, label: "Reveal",
+                         steps: ["OFF", "WIPE", "RAND"])
+                Text("Route an LFO to spreadsheetSelectionSpeed in Control to sync the cursor.")
+                    .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+
+    /// Post-chain tracking HUD (finisher pass): recorded/NDI/MJPEG too.
+    @ViewBuilder private var trackingHUDSection: some View {
+        Section("Tracking HUD Overlay (after chain — recorded too)") {
+            Toggle("Tracking HUD Overlay", isOn: Binding(
+                get: { app.params.bool(.trackingHUDEnabled) },
+                set: { app.params.set(.trackingHUDEnabled, $0 ? 1 : 0, origin: .ui) }))
+            if app.params.bool(.trackingHUDEnabled) {
+                ParamRow(id: .trackingHUDPointDensity, label: "Points")
+                ParamRow(id: .trackingHUDLabelDensity, label: "Labels")
+                ParamRow(id: .trackingHUDLineOpacity, label: "Mesh")
+                ParamRow(id: .trackingHUDColor, label: "Hue°")
+                Text("Points follow real Vision optical flow; route an LFO to trackingHUDColor for a color sweep.")
+                    .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
         }
     }

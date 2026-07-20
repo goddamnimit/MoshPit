@@ -211,8 +211,48 @@ struct FinisherUniforms {
     float shadowHue;         // degrees, duotone
     float highlightHue;      // degrees, duotone
     float hueShift;          // degrees, hue-shift mode
+    int   gridWarpEnabled;   // 0 off, 1 on
+    float gridWarpCellSize;  // grid cells across the short edge
+    float gridWarpIntensity; // displacement magnitude, UV units
+    float gridWarpLineOpacity; // 0 invisible mesh, 1 fully visible
+    float gridWarpPhase;     // accumulated time * animSpeed, drives the field
+    int   sheetEnabled;      // 0 off, 1 on — Spreadsheet Mosh Filter
+    float sheetCols;         // columns across the frame width
+    float sheetRows;         // rows (derived from aspect on the CPU side)
+    float sheetChromeOpacity;   // blend raw mosaic <-> full chrome overlay
+    float sheetLineOpacity;     // gridline visibility within the chrome
+    float sheetSelPhase;        // accumulated time * selectionSpeed, in cells
+    int   sheetRevealMode;      // 0 full grid, 1 sequential wipe, 2 random
+    int   hudEnabled;           // 0 off, 1 on — Tracking HUD Overlay
+    float hudPointCount;        // tracked points drawn (density)
+    float hudLabelDensity;      // fraction of points with coordinate text
+    float hudLineOpacity;       // sparse connecting-mesh visibility
+    float hudHue;               // overlay hue, degrees (hueWheel)
     float pad0, pad1;
 };
+
+// Cheap 2D hash -> [0,1), used as the procedural per-cell displacement field
+// for Grid-Mesh Glitch Warp (no texture asset — pure in-shader noise).
+static inline float gridWarpHash(float2 p) {
+    float3 p3 = fract(float3(p.x, p.y, p.x) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+// Sample one glyph from the 37-slot atlas (0-9, A-Z, then ':'; single row,
+// baked on the CPU at FinisherPass init). `luv` is the glyph-local uv.
+static inline float sheetGlyphAlpha(texture2d<float, access::sample> atlas,
+                                    sampler s, int glyph, float2 luv) {
+    if (luv.x < 0.0 || luv.x > 1.0 || luv.y < 0.0 || luv.y > 1.0) return 0.0;
+    // CoreGraphics bakes bottom-up; flip v so glyphs read upright.
+    return atlas.sample(s, float2((float(glyph) + luv.x) / 37.0, 1.0 - luv.y)).a;
+}
+
+// Stable scatter position for tracking-HUD point `i` (uv, inset from edges).
+static inline float2 hudPointBase(float i) {
+    return float2(gridWarpHash(float2(i * 1.618, 7.3)),
+                  gridWarpHash(float2(i * 2.113, 41.9))) * 0.92 + 0.04;
+}
 
 // Full-saturation hue wheel (degrees) -> RGB, matches FinisherMath.hueToRGB.
 static inline float3 hueWheel(float deg) {
@@ -228,6 +268,8 @@ static inline float3 hueWheel(float deg) {
 
 kernel void finisherPass(texture2d<float, access::sample> input  [[texture(0)]],
                          texture2d<float, access::write>  output [[texture(1)]],
+                         texture2d<float, access::sample> glyphs [[texture(2)]],
+                         texture2d<float, access::sample> flow   [[texture(3)]],
                          constant FinisherUniforms& u            [[buffer(0)]],
                          uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= output.get_width() || gid.y >= output.get_height()) return;
@@ -242,7 +284,61 @@ kernel void finisherPass(texture2d<float, access::sample> input  [[texture(0)]],
     } else if (u.mirrorMode == 3) {
         uv = min(uv, 1.0 - uv);   // four quadrants of the top-left quadrant
     }
-    float3 c = input.sample(s, uv).rgb;
+
+    float gridLine = 0.0;
+    if (u.gridWarpEnabled != 0) {
+        float cells = max(1.0, u.gridWarpCellSize);
+        float2 cellUV = uv * cells;
+        float2 cellId = floor(cellUV);
+        float2 cellFrac = fract(cellUV);
+
+        // Per-cell procedural displacement: two hashed scalars (x/y) walked
+        // forward by the animated phase, so each cell drifts independently.
+        float2 seed = cellId + u.gridWarpPhase;
+        float dx = gridWarpHash(seed) * 2.0 - 1.0;
+        float dy = gridWarpHash(seed + float2(19.19, 7.7)) * 2.0 - 1.0;
+        uv += float2(dx, dy) * u.gridWarpIntensity;
+        uv = clamp(uv, 0.0, 1.0);
+
+        // Mesh line mask: thin bands near each cell's edges, in screen space
+        // (independent of the displacement so the mesh reads as an overlay).
+        float2 edgeDist = min(cellFrac, 1.0 - cellFrac);
+        float lineWidth = 0.04;
+        float ex = 1.0 - smoothstep(0.0, lineWidth, edgeDist.x);
+        float ey = 1.0 - smoothstep(0.0, lineWidth, edgeDist.y);
+        gridLine = max(ex, ey) * u.gridWarpLineOpacity;
+    }
+
+    // Spreadsheet mosaic quantize: the (possibly mirrored/warped) uv picks a
+    // cell; populated cells flatten to the cell's average color, so moshed
+    // motion stays visible as shifting cell colors.
+    float3 c;
+    bool sheetOn = u.sheetEnabled != 0;
+    float2 sheetDims = float2(max(1.0, u.sheetCols), max(1.0, u.sheetRows));
+    if (sheetOn) {
+        float2 cellId = floor(uv * sheetDims);
+        float total = sheetDims.x * sheetDims.y;
+        float idx = cellId.y * sheetDims.x + cellId.x;
+        bool populated = true;
+        if (u.sheetRevealMode == 1) {          // sequential wipe, reading order
+            populated = idx / total <= fract(u.sheetSelPhase / total);
+        } else if (u.sheetRevealMode == 2) {   // random reveal
+            populated = gridWarpHash(cellId + 3.7) <= fract(u.sheetSelPhase / total);
+        }
+        if (populated) {
+            // 3x3 tap average over the cell approximates its flat mean color.
+            float3 acc = float3(0.0);
+            for (int j = 0; j < 3; j++)
+                for (int i = 0; i < 3; i++)
+                    acc += input.sample(s, (cellId + (float2(i, j) + 0.5) / 3.0)
+                                           / sheetDims).rgb;
+            c = acc / 9.0;
+        } else {
+            c = input.sample(s, uv).rgb;
+        }
+    } else {
+        c = input.sample(s, uv).rgb;
+    }
 
     if (u.colorMode == 1) {                       // invert
         c = 1.0 - clamp(c, 0.0, 1.0);
@@ -260,6 +356,143 @@ kernel void finisherPass(texture2d<float, access::sample> input  [[texture(0)]],
         float ca = cos(rad), sa = sin(rad);
         yiq.yz = float2x2(float2(ca, sa), float2(-sa, ca)) * yiq.yz;
         c = toRGB * yiq;
+    }
+    if (u.gridWarpEnabled != 0 && gridLine > 0.0) {
+        c = mix(c, float3(1.0) - c, gridLine * 0.999); // bright, mode-agnostic mesh line
+    }
+
+    // Spreadsheet chrome overlay — screen-space, drawn topmost. Deliberately
+    // generic light-gray/white sheet chrome: no branding, no app colors.
+    if (sheetOn && u.sheetChromeOpacity > 0.0) {
+        float chrome = clamp(u.sheetChromeOpacity, 0.0, 1.0);
+        float2 suv = (float2(gid) + 0.5)
+            / float2(output.get_width(), output.get_height());
+        float2 cuv = suv * sheetDims;
+        float2 cellId = floor(cuv);
+        float2 frac = fract(cuv);
+        float2 edge = min(frac, 1.0 - frac);
+
+        // Gridlines between cells (thin, light gray).
+        float line = (1.0 - smoothstep(0.0, 0.05, min(edge.x, edge.y)))
+            * clamp(u.sheetLineOpacity, 0.0, 1.0);
+        c = mix(c, float3(0.78), line * chrome);
+
+        // Animated active-cell selection: border + fill-handle square,
+        // stepping through cells in reading order over time.
+        float total = sheetDims.x * sheetDims.y;
+        float selIdx = fmod(floor(u.sheetSelPhase), total);
+        float2 selCell = float2(fmod(selIdx, sheetDims.x),
+                                floor(selIdx / sheetDims.x));
+        const float3 kSelColor = float3(0.16, 0.38, 0.75); // neutral UI blue
+        if (all(cellId == selCell)) {
+            if (edge.x < 0.09 || edge.y < 0.09) c = mix(c, kSelColor, chrome);
+            if (frac.x > 0.82 && frac.y > 0.82) c = mix(c, kSelColor, chrome); // fill handle
+        }
+
+        // Top chrome bands: generic toolbar + formula bar + column header.
+        const float kToolbarH = 0.035, kFormulaH = 0.030, kHeadH = 0.032;
+        const float kHeadW = 0.045; // row-number rail width
+        if (suv.y < kToolbarH) {
+            float3 bar = float3(0.93);
+            if (suv.y > kToolbarH * 0.9) bar = float3(0.80);   // divider
+            c = mix(c, bar, chrome);
+        } else if (suv.y < kToolbarH + kFormulaH) {
+            float3 bar = float3(0.97);
+            if (suv.y > kToolbarH + kFormulaH * 0.9) bar = float3(0.80);
+            c = mix(c, bar, chrome);
+        } else if (suv.y < kToolbarH + kFormulaH + kHeadH) {
+            float3 band = float3(0.88);
+            if (suv.x > kHeadW) {                              // column letters
+                float col = floor(suv.x * sheetDims.x);
+                int glyph = 10 + int(fmod(col, 26.0));         // 'A' + col%26
+                float gx = fract(suv.x * sheetDims.x);
+                float gy = (suv.y - kToolbarH - kFormulaH) / kHeadH;
+                float2 luv = float2((gx - 0.30) / 0.40, (gy - 0.10) / 0.80);
+                float a = sheetGlyphAlpha(glyphs, s, glyph, luv);
+                band = mix(band, float3(0.25), a);
+            }
+            c = mix(c, band, chrome);
+        } else if (suv.x < kHeadW) {                           // row numbers
+            float3 band = float3(0.88);
+            float row = floor(suv.y * sheetDims.y);
+            int n = (int(row) + 1) % 100;
+            float gy = fract(suv.y * sheetDims.y);
+            float gx = suv.x / kHeadW;
+            // Two digit slots; tens digit hidden below 10.
+            int tens = n / 10, ones = n % 10;
+            float2 luvT = float2((gx - 0.08) / 0.40, (gy - 0.12) / 0.76);
+            float2 luvO = float2((gx - 0.52) / 0.40, (gy - 0.12) / 0.76);
+            float a = 0.0;
+            if (tens > 0) a = max(a, sheetGlyphAlpha(glyphs, s, tens, luvT));
+            a = max(a, sheetGlyphAlpha(glyphs, s, ones, tens > 0 ? luvO : luvT + float2(-0.55, 0.0)));
+            band = mix(band, float3(0.25), a);
+            c = mix(c, band, chrome);
+        }
+    }
+
+    // Tracking HUD overlay — decorative VFX-style motion-tracking readout,
+    // drawn topmost in pure screen space. Points are hash-scattered, then
+    // displaced by the REAL optical-flow field sampled at their location so
+    // they twitch with actual scene motion. rg32Float isn't filterable on
+    // all GPUs, so the flow field is sampled with a nearest-filter sampler.
+    if (u.hudEnabled != 0) {
+        constexpr sampler sf(coord::normalized, address::clamp_to_edge, filter::nearest);
+        float2 res = float2(output.get_width(), output.get_height());
+        float2 px = float2(gid) + 0.5;
+        float acc = 0.0;
+        int n = clamp(int(u.hudPointCount), 1, 64);
+        for (int i = 0; i < n; i++) {
+            float fi = float(i);
+            float2 base = hudPointBase(fi);
+            float2 fl = flow.sample(sf, base).rg;              // px of motion
+            float2 pt = clamp(base + fl * 0.004, 0.02, 0.98);  // uv drift
+            float2 ppx = pt * res;
+            float d = length(px - ppx);
+
+            // Feature dot (~2.5 px, soft 1 px edge).
+            acc = max(acc, 1.0 - smoothstep(1.8, 3.0, d));
+
+            // Occasional larger "search radius" circle.
+            if (i % 9 == 3) {
+                acc = max(acc, (1.0 - smoothstep(0.7, 1.7, fabs(d - 22.0))) * 0.7);
+            }
+
+            // Sparse mesh: thin line from ~every 3rd point to its successor.
+            if (u.hudLineOpacity > 0.0 && (i % 3) == 0 && i + 1 < n) {
+                float2 b2 = hudPointBase(fi + 1.0);
+                float2 p2 = clamp(b2 + flow.sample(sf, b2).rg * 0.004,
+                                  0.02, 0.98) * res;
+                float2 ab = p2 - ppx, ap = px - ppx;
+                float t = clamp(dot(ap, ab) / max(dot(ab, ab), 1.0), 0.0, 1.0);
+                float dl = length(ap - ab * t);
+                acc = max(acc, (1.0 - smoothstep(0.3, 1.1, dl)) * u.hudLineOpacity);
+            }
+
+            // Coordinate readout "X:1234 Y:0987" on a hash-chosen subset,
+            // typeset from the shared glyph atlas (no runtime text layout).
+            if (gridWarpHash(float2(fi, 5.5)) < u.hudLabelDensity) {
+                const float gw = 7.0, gh = 11.0;
+                float2 lp = px - (ppx + float2(8.0, -20.0));
+                if (lp.x >= 0.0 && lp.x < gw * 13.0 && lp.y >= 0.0 && lp.y < gh) {
+                    int slot = int(lp.x / gw);
+                    int glyph = -1;
+                    if (slot == 0) glyph = 33;                       // X
+                    else if (slot == 1 || slot == 8) glyph = 36;     // :
+                    else if (slot == 7) glyph = 34;                  // Y
+                    else if (slot != 6) {                            // digits
+                        int v = slot < 6 ? int(ppx.x) : int(ppx.y);
+                        int k = slot < 6 ? slot - 2 : slot - 9;
+                        int div = k == 0 ? 1000 : (k == 1 ? 100 : (k == 2 ? 10 : 1));
+                        glyph = (v / div) % 10;
+                    }
+                    if (glyph >= 0) {
+                        float2 luv = float2(fmod(lp.x, gw) / gw, lp.y / gh);
+                        acc = max(acc, sheetGlyphAlpha(glyphs, s, glyph, luv));
+                    }
+                }
+            }
+        }
+        c = mix(c, hueWheel(u.hudHue), min(acc, 1.0) * 0.9);
     }
     output.write(float4(c, 1.0), gid);
 }

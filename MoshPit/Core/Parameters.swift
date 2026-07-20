@@ -79,6 +79,22 @@ enum ParameterID: String, CaseIterable, Codable, Hashable {
     case duotoneShadowHue       // degrees, duotone shadow color
     case duotoneHighlightHue    // degrees, duotone highlight color
     case colorHueShift          // degrees, hue-shift color mode (LFO-friendly)
+    case gridWarpEnabled        // 0 off, 1 on
+    case gridWarpCellSize       // grid density, cells across the short edge
+    case gridWarpIntensity      // displacement magnitude, UV units
+    case gridWarpLineOpacity    // 0 invisible warp only, 1 fully visible mesh
+    case gridWarpAnimSpeed      // drives the displacement field's time phase (LFO-friendly)
+    case spreadsheetEnabled     // 0 off, 1 on
+    case spreadsheetCellSize    // columns across the width; rows derive from aspect
+    case spreadsheetChromeOpacity   // blend raw mosaic <-> full chrome overlay
+    case spreadsheetGridLineOpacity // gridline visibility within the chrome
+    case spreadsheetSelectionSpeed  // active-cell steps per second (LFO-friendly)
+    case spreadsheetCellRevealMode  // 0 full grid, 1 sequential wipe, 2 random
+    case trackingHUDEnabled         // 0 off, 1 on
+    case trackingHUDPointDensity    // how many tracked points get drawn
+    case trackingHUDLabelDensity    // fraction of points with coordinate text
+    case trackingHUDLineOpacity     // connecting sparse-mesh line visibility
+    case trackingHUDColor           // hue degrees (same pattern as duotone hues)
 
     // Output
     case cleanFeed
@@ -130,6 +146,18 @@ enum ParameterID: String, CaseIterable, Codable, Hashable {
         case .wipeSoftness: return 0.15
         case .duotoneShadowHue: return 230    // cool shadows
         case .duotoneHighlightHue: return 20  // warm highlights
+        case .gridWarpCellSize: return 12     // 12 cells across the short edge
+        case .gridWarpIntensity: return 0.02  // subtle displacement by default
+        case .gridWarpLineOpacity: return 0.5
+        case .gridWarpAnimSpeed: return 1
+        case .spreadsheetCellSize: return 16   // 16 columns across the width
+        case .spreadsheetChromeOpacity: return 1
+        case .spreadsheetGridLineOpacity: return 0.8
+        case .spreadsheetSelectionSpeed: return 2
+        case .trackingHUDPointDensity: return 24
+        case .trackingHUDLabelDensity: return 0.35
+        case .trackingHUDLineOpacity: return 0.4
+        case .trackingHUDColor: return 350    // matches Theme.accent's hue
         default: return 0
         }
     }
@@ -179,6 +207,14 @@ enum ParameterID: String, CaseIterable, Codable, Hashable {
         case .wipeMode: return 0...2
         case .mirrorMode, .colorMode: return 0...3
         case .duotoneShadowHue, .duotoneHighlightHue, .colorHueShift: return 0...360
+        case .gridWarpCellSize: return 2...48
+        case .gridWarpIntensity: return 0...0.15
+        case .gridWarpAnimSpeed: return 0...4
+        case .spreadsheetCellSize: return 4...48
+        case .spreadsheetSelectionSpeed: return 0...16
+        case .spreadsheetCellRevealMode: return 0...2
+        case .trackingHUDPointDensity: return 4...48
+        case .trackingHUDColor: return 0...360
         default: return 0...1
         }
     }

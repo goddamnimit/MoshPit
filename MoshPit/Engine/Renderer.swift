@@ -310,7 +310,8 @@ final class MoshRenderer: NSObject, MTKViewDelegate {
         // Finisher (mirror + color modes) — last image pass before output, so
         // preview AND recorder/NDI/MJPEG all see the finished frame.
         if let chained = final {
-            final = finisher.encode(commandBuffer: cb, input: chained)
+            final = finisher.encode(commandBuffer: cb, input: chained, dt: dt,
+                                    flow: engine.visionFlow.latestFlow)
         }
 
         // Motion statistics for HUD + mod matrix (read back next frame).

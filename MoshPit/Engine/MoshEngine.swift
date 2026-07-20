@@ -72,6 +72,9 @@ final class MoshEngine {
     /// Thermal fallback: when hot, estimation drops one resolution step.
     var thermalDowngrade = false
 
+    /// Throttle for the tracking HUD's side-band Vision flow (every 3rd frame).
+    private var hudFlowFrameCounter = 0
+
     init(ctx: MetalContext, params: ParameterStore) {
         self.ctx = ctx
         self.params = params
@@ -213,6 +216,17 @@ final class MoshEngine {
             let estimator: MotionEstimator = backend == 1 ? visionFlow : blockMatch
             flow = estimator.estimate(cur: estCur, prev: estPrev,
                                       commandBuffer: commandBuffer)
+            // Tracking HUD side-tap: when the mosh runs on block match, the
+            // Vision flow the HUD visualizes is computed alongside — async,
+            // off the render loop, and throttled to every 3rd frame (points
+            // hold their last position between updates). Never feeds the mosh.
+            if backend != 1, params.bool(.trackingHUDEnabled) {
+                hudFlowFrameCounter += 1
+                if hudFlowFrameCounter % 3 == 0 {
+                    _ = visionFlow.estimate(cur: estCur, prev: estPrev,
+                                            commandBuffer: commandBuffer)
+                }
+            }
         }
 
         // 3. Reset = manual I-frame (or first frame ever). The FIRST seed
