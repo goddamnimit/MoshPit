@@ -7,6 +7,10 @@ import SwiftUI
 enum CoachAnchor: String, CaseIterable {
     case canvas, leftHandle, modeList, panelTriggers, rightHandle
     case xyPad, paramRows, resetButton, recordButton, bloomButton, hudPill
+    /// Finisher-effect toggles inside the Effects panel sheet. Sheets are a
+    /// separate view hierarchy from moshRoot, so these publish/consume via
+    /// `.global` instead — see `coachAnchorGlobal` below.
+    case gridWarpToggle, spreadsheetToggle, trackingHUDToggle
     case finale   // full-screen card, no spotlight
 }
 
@@ -15,12 +19,16 @@ struct CoachStop: Equatable {
     let text: String
     /// Drawer that must be open for this stop (tutorial opens/closes it).
     let drawer: DrawerSide?
+    /// Panel sheet that must be open for this stop (tutorial opens/closes
+    /// it the same way it does drawers). nil for every stop outside the
+    /// Effects panel.
+    var panel: AppModel.Panel? = nil
 }
 
 enum CoachScript {
     static let hasSeenKey = "hasSeenCoachMarks"
 
-    /// The 12 stops, in order, plain non-technical language.
+    /// The 15 stops, in order, plain non-technical language.
     static let stops: [CoachStop] = [
         .init(anchor: .canvas,
               text: "This is your canvas — your live camera feed gets glitched and smeared here in real time.",
@@ -34,6 +42,15 @@ enum CoachScript {
         .init(anchor: .panelTriggers,
               text: "These panels give you sources (camera or video), effects, rhythm controls, automation, and output options.",
               drawer: .left),
+        .init(anchor: .gridWarpToggle,
+              text: "The Effects panel also hides Grid-Mesh Glitch Warp — a drifting displacement mesh applied after everything else.",
+              drawer: nil, panel: .effects),
+        .init(anchor: .spreadsheetToggle,
+              text: "Spreadsheet Mosh Filter quantizes your glitch into cells under generic ledger chrome, with an animated selection box.",
+              drawer: nil, panel: .effects),
+        .init(anchor: .trackingHUDToggle,
+              text: "Tracking HUD Overlay scatters real motion-tracking dots and coordinate readouts across the frame — pure VFX flavor.",
+              drawer: nil, panel: .effects),
         .init(anchor: .rightHandle,
               text: "Swipe from the right to tune the active effect with sliders and an XY pad.",
               drawer: nil),
@@ -79,6 +96,17 @@ extension View {
                                    value: [anchor: geo.frame(in: .named("moshRoot"))])
         })
     }
+
+    /// Same idea, for anchors that live inside a `.sheet` (e.g. the Effects
+    /// panel): sheet content is a separate view hierarchy, so "moshRoot"
+    /// isn't reachable there — `.global` is the one coordinate space shared
+    /// by every hierarchy, sheet or not.
+    func coachAnchorGlobal(_ anchor: CoachAnchor) -> some View {
+        overlay(GeometryReader { geo in
+            Color.clear.preference(key: CoachFrameKey.self,
+                                   value: [anchor: geo.frame(in: .global)])
+        })
+    }
 }
 
 // MARK: overlay
@@ -89,11 +117,17 @@ extension View {
 struct CoachOverlay: View {
     @EnvironmentObject var app: AppModel
     let frames: [CoachAnchor: CGRect]
+    /// nil = the root-hosted instance (shows every stop with no panel
+    /// requirement, i.e. all 12 original stops). A specific panel = the
+    /// instance hosted inside that panel's sheet (shows only stops that
+    /// require it, e.g. the 3 Effects-panel Finisher stops).
+    var hostPanel: AppModel.Panel? = nil
 
     @State private var lastTarget: CGRect? = nil
 
     var body: some View {
-        if let index = app.coachIndex, index < CoachScript.stops.count {
+        if let index = app.coachIndex, index < CoachScript.stops.count,
+           CoachScript.stops[index].panel == hostPanel {
             let stop = CoachScript.stops[index]
             GeometryReader { geo in
                 ZStack {
@@ -166,10 +200,13 @@ struct CoachOverlay: View {
         let raw = frames[stop.anchor] ?? CGRect(x: geo.size.width / 2 - 40,
                                                 y: geo.size.height / 2 - 40,
                                                 width: 80, height: 80)
-        // moshRoot -> overlay-local. With ignoresSafeArea the overlay's origin
-        // is (0,0) and this is the identity, but converting explicitly keeps
-        // the ring glued to its target even if the overlay is ever re-hosted.
-        let localFrame = geo.frame(in: .named("moshRoot"))
+        // Sheet-hosted instances (hostPanel != nil) publish/consume via
+        // .global — "moshRoot" isn't reachable from inside a .sheet. The
+        // root instance keeps using moshRoot -> overlay-local as before.
+        // With ignoresSafeArea the overlay's origin is (0,0) and this is the
+        // identity, but converting explicitly keeps the ring glued to its
+        // target even if the overlay is ever re-hosted.
+        let localFrame = hostPanel != nil ? geo.frame(in: .global) : geo.frame(in: .named("moshRoot"))
         return raw.offsetBy(dx: -localFrame.origin.x, dy: -localFrame.origin.y)
             .insetBy(dx: -Theme.g1, dy: -Theme.g1)   // 8pt padding
     }
@@ -461,6 +498,24 @@ enum DemoLibrary {
                  blurb: "Cascading streaks along brightness edges.") { app in
             app.openSheet(.effects)
             app.activeTip = "PXLMSH sorts pixels along brightness edges. High threshold = subtle sorting along bright edges only. Low threshold = whole regions cascade."
+        },
+        DemoCard(id: "gridwarp", section: "Visual Effects", title: "Grid-Mesh Glitch Warp",
+                 blurb: "A drifting mesh displaces every cell.") { app in
+            app.params.set(.gridWarpEnabled, 1, origin: .ui)
+            app.openSheet(.effects)
+            app.activeTip = "Grid-Mesh Glitch Warp displaces your frame through a procedural cell mesh. Route an LFO to Speed for a pulsing warp."
+        },
+        DemoCard(id: "spreadsheet", section: "Visual Effects", title: "Spreadsheet Mosh Filter",
+                 blurb: "Your glitch, quantized into a ledger.") { app in
+            app.params.set(.spreadsheetEnabled, 1, origin: .ui)
+            app.openSheet(.effects)
+            app.activeTip = "Spreadsheet Mosh Filter averages each cell into a flat color under generic ledger chrome. Try the Reveal modes for a wipe-in."
+        },
+        DemoCard(id: "trackinghud", section: "Visual Effects", title: "Tracking HUD Overlay",
+                 blurb: "Decorative motion-tracking dots and readouts.") { app in
+            app.params.set(.trackingHUDEnabled, 1, origin: .ui)
+            app.openSheet(.effects)
+            app.activeTip = "Tracking HUD Overlay scatters dots along real optical-flow motion with coordinate readouts — pure VFX-style decoration."
         },
     ]
 

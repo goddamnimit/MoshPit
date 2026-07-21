@@ -36,6 +36,10 @@ final class AppModel: ObservableObject {
     @Published var coachIndex: Int? = nil
     /// True when the tutorial is waiting for a drawer to animate open/close before positioning the spotlight.
     @Published var isTutorialTransitioning = false
+    /// Coach-anchor frames published from inside the Effects panel sheet
+    /// (moshRoot doesn't reach in there — see coachAnchorGlobal). Merged
+    /// separately from RootView's own moshRoot-space anchor frames.
+    @Published var sheetAnchorFrames: [CoachAnchor: CGRect] = [:]
     /// Floating dismissible tip card (guided demos).
     @Published var activeTip: String? = nil
     /// ParamRow to highlight (guided demos); cleared on interaction.
@@ -538,6 +542,7 @@ final class AppModel: ObservableObject {
     func startTutorial() {
         isTutorialTransitioning = false
         openDrawer = CoachScript.stops[0].drawer
+        activePanel = CoachScript.stops[0].panel
         withAnimation(Theme.fade) { coachIndex = 0 }
     }
 
@@ -545,16 +550,21 @@ final class AppModel: ObservableObject {
         guard let index = coachIndex else { return }
         let next = index + 1
         guard next < CoachScript.stops.count else { finishTutorial(); return }
-        // Open/close drawers so each stop's target is actually on screen.
-        if openDrawer != CoachScript.stops[next].drawer {
+        let nextStop = CoachScript.stops[next]
+        // Open/close the drawer AND/OR panel sheet so each stop's target is
+        // actually on screen (panel sheets use the same gating as drawers —
+        // e.g. the Finisher-effect stops that live inside the Effects panel).
+        if openDrawer != nextStop.drawer || activePanel != nextStop.panel {
             isTutorialTransitioning = true
-            openDrawer = CoachScript.stops[next].drawer
-            // Let the drawer's 0.3s spring settle (plus a beat for the final
-            // layout pass) BEFORE spotlighting: a frame read mid-slide pins
-            // the ring where the element was, not where it lands. Drawer
+            openDrawer = nextStop.drawer
+            activePanel = nextStop.panel
+            // Let the drawer's 0.3s spring (or the sheet's presentation
+            // animation) settle (plus a beat for the final layout pass)
+            // BEFORE spotlighting: a frame read mid-slide pins the ring
+            // where the element was, not where it lands. Drawer/sheet
             // motion is a rendering .offset — the published .global frames
             // are the resting positions — but the fade must not race the
-            // preference update of newly appearing drawer content.
+            // preference update of newly appearing drawer/sheet content.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
                 guard let self, self.coachIndex == index else { return }   // skipped?
                 self.isTutorialTransitioning = false
@@ -570,6 +580,7 @@ final class AppModel: ObservableObject {
     func finishTutorial() {
         UserDefaults.standard.set(true, forKey: CoachScript.hasSeenKey)
         openDrawer = nil
+        activePanel = nil
         isTutorialTransitioning = false
         withAnimation(Theme.fade) { coachIndex = nil }
     }

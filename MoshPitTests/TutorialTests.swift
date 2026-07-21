@@ -2,29 +2,38 @@ import XCTest
 @testable import MoshPit
 
 final class TutorialTests: XCTestCase {
-    /// The coach-mark script must cover all 12 stops in the specified order,
-    /// and drawer-hosted stops must name the drawer that contains them.
+    /// The coach-mark script must cover all 15 stops in the specified order,
+    /// and drawer/panel-hosted stops must name the drawer/panel that
+    /// contains them.
     func testCoachSequenceCoversAllStopsInOrder() {
         let stops = CoachScript.stops
-        XCTAssertEqual(stops.count, 12)
+        XCTAssertEqual(stops.count, 15)
         let expectedAnchors: [CoachAnchor] = [
-            .canvas, .leftHandle, .modeList, .panelTriggers, .rightHandle,
-            .xyPad, .paramRows, .resetButton, .recordButton, .bloomButton,
-            .hudPill, .finale,
+            .canvas, .leftHandle, .modeList, .panelTriggers,
+            .gridWarpToggle, .spreadsheetToggle, .trackingHUDToggle,
+            .rightHandle, .xyPad, .paramRows, .resetButton, .recordButton,
+            .bloomButton, .hudPill, .finale,
         ]
         XCTAssertEqual(stops.map(\.anchor), expectedAnchors)
 
         // Drawer mapping: mode list + panel triggers live in the LEFT drawer;
-        // XY pad + param rows live in the RIGHT drawer; everything else needs
-        // no drawer open.
+        // XY pad + param rows live in the RIGHT drawer; the three Finisher
+        // toggles live in the Effects panel sheet (no drawer, panel set
+        // instead); everything else needs no drawer/panel open.
         for stop in stops {
             switch stop.anchor {
             case .modeList, .panelTriggers:
                 XCTAssertEqual(stop.drawer, .left, "\(stop.anchor) is in the left drawer")
+                XCTAssertNil(stop.panel, "\(stop.anchor) needs no panel")
             case .xyPad, .paramRows:
                 XCTAssertEqual(stop.drawer, .right, "\(stop.anchor) is in the right drawer")
+                XCTAssertNil(stop.panel, "\(stop.anchor) needs no panel")
+            case .gridWarpToggle, .spreadsheetToggle, .trackingHUDToggle:
+                XCTAssertNil(stop.drawer, "\(stop.anchor) needs no drawer")
+                XCTAssertEqual(stop.panel, .effects, "\(stop.anchor) is in the Effects panel")
             default:
                 XCTAssertNil(stop.drawer, "\(stop.anchor) needs no drawer")
+                XCTAssertNil(stop.panel, "\(stop.anchor) needs no panel")
             }
         }
         // Every stop has real copy; no anchor repeats.

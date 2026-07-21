@@ -28,6 +28,12 @@ struct PanelSheet: View {
         }
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
+        // Coach marks that target content inside this sheet (e.g. the
+        // Finisher-effect toggles in Effects): a sheet is its own view
+        // hierarchy, so it needs its own preference collection and its own
+        // hosted CoachOverlay instance — see coachAnchorGlobal / hostPanel.
+        .onPreferenceChange(CoachFrameKey.self) { app.sheetAnchorFrames = $0 }
+        .overlay { CoachOverlay(frames: app.sheetAnchorFrames, hostPanel: panel) }
     }
 }
 
@@ -323,6 +329,7 @@ struct EffectsPanel: View {
             Toggle("Grid-Mesh Glitch Warp", isOn: Binding(
                 get: { app.params.bool(.gridWarpEnabled) },
                 set: { app.params.set(.gridWarpEnabled, $0 ? 1 : 0, origin: .ui) }))
+                .coachAnchorGlobal(.gridWarpToggle)
             if app.params.bool(.gridWarpEnabled) {
                 ParamRow(id: .gridWarpCellSize, label: "Cells")
                 ParamRow(id: .gridWarpIntensity, label: "Warp")
@@ -340,6 +347,7 @@ struct EffectsPanel: View {
             Toggle("Spreadsheet Mosh Filter", isOn: Binding(
                 get: { app.params.bool(.spreadsheetEnabled) },
                 set: { app.params.set(.spreadsheetEnabled, $0 ? 1 : 0, origin: .ui) }))
+                .coachAnchorGlobal(.spreadsheetToggle)
             if app.params.bool(.spreadsheetEnabled) {
                 ParamRow(id: .spreadsheetCellSize, label: "Cols")
                 ParamRow(id: .spreadsheetChromeOpacity, label: "Chrome")
@@ -359,6 +367,7 @@ struct EffectsPanel: View {
             Toggle("Tracking HUD Overlay", isOn: Binding(
                 get: { app.params.bool(.trackingHUDEnabled) },
                 set: { app.params.set(.trackingHUDEnabled, $0 ? 1 : 0, origin: .ui) }))
+                .coachAnchorGlobal(.trackingHUDToggle)
             if app.params.bool(.trackingHUDEnabled) {
                 ParamRow(id: .trackingHUDPointDensity, label: "Points")
                 ParamRow(id: .trackingHUDLabelDensity, label: "Labels")

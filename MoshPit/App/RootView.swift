@@ -330,6 +330,7 @@ struct RootView: View {
             // after its spring settles (same sequencing as advanceTutorial).
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 app.openDrawer = CoachScript.stops[n].drawer
+                app.activePanel = CoachScript.stops[n].panel
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     withAnimation(Theme.fade) { app.coachIndex = n }
                 }
