@@ -9,6 +9,7 @@ struct PanelSheet: View {
     let panel: AppModel.Panel
 
     var body: some View {
+        perfBody(Perf.sheet, "PanelSheet.body", "\(panel.rawValue)") {
         NavigationStack {
             Group {
                 switch panel {
@@ -32,8 +33,15 @@ struct PanelSheet: View {
         // Finisher-effect toggles in Effects): a sheet is its own view
         // hierarchy, so it needs its own preference collection and its own
         // hosted CoachOverlay instance — see coachAnchorGlobal / hostPanel.
-        .onPreferenceChange(CoachFrameKey.self) { app.sheetAnchorFrames = $0 }
+        .onPreferenceChange(CoachFrameKey.self) {
+            // Preference fan-out from inside the sheet writes an @Published
+            // dictionary on AppModel — i.e. it invalidates the whole tree.
+            // Worth seeing next to the sheet body rebuilds.
+            Perf.coach.emitEvent("sheetAnchorFrames", "\(panel.rawValue) \($0.count) anchors")
+            app.sheetAnchorFrames = $0
+        }
         .overlay { CoachOverlay(frames: app.sheetAnchorFrames, hostPanel: panel) }
+        }
     }
 }
 

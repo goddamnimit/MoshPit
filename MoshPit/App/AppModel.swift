@@ -366,10 +366,19 @@ final class AppModel: ObservableObject {
     private static let overlaySwap: TimeInterval = 0.35   // drawer spring + beat
 
     func openSheet(_ panel: Panel) {
-        Perf.event("openSheet", panel.rawValue)
+        // Interval spans the WHOLE call, including the 0.35s deferred
+        // presentation when an overlay has to animate away first. Read the
+        // trace as: a ~0.35s+ interval means the swap path ran; a short one
+        // means direct presentation. `openSheet.commit` marks the state
+        // mutation that actually triggers the sheet.
+        let state = Perf.sheet.beginInterval("openSheet", id: Perf.sheet.makeSignpostID(),
+                                             "\(panel.rawValue)")
         showCheatSheet = false
         showDemoSheet = false
-        guard activePanel != panel else { return }
+        guard activePanel != panel else {
+            Perf.sheet.endInterval("openSheet", state, "already-open")
+            return
+        }
         // Animate the drawer closed / old sheet down BEFORE presenting, so
         // the two are never on screen together.
         let wait = openDrawer != nil || activePanel != nil
@@ -377,15 +386,24 @@ final class AppModel: ObservableObject {
         activePanel = nil
         if wait {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.overlaySwap) {
-                [weak self] in self?.activePanel = panel
+                [weak self] in
+                Perf.sheet.emitEvent("openSheet.commit", "deferred \(Self.overlaySwap)s")
+                self?.activePanel = panel
+                Perf.sheet.endInterval("openSheet", state, "deferred")
             }
         } else {
+            Perf.sheet.emitEvent("openSheet.commit", "immediate")
             activePanel = panel
+            Perf.sheet.endInterval("openSheet", state, "immediate")
         }
     }
 
     func openDrawer(_ side: DrawerSide?) {
-        Perf.event("openDrawer", side.map { "\($0)" } ?? "close")
+        // Same shape as openSheet: the interval covers the deferred
+        // presentation, so drawer-open latency is one bar in the trace.
+        let label = side.map { "\($0)" } ?? "close"
+        let state = Perf.drawer.beginInterval("openDrawer", id: Perf.drawer.makeSignpostID(),
+                                              "\(label)")
         let hadSheet = activePanel != nil || showCheatSheet || showDemoSheet
         activePanel = nil
         showCheatSheet = false
@@ -393,10 +411,15 @@ final class AppModel: ObservableObject {
         if hadSheet, side != nil {
             // Let the sheet's dismiss animation finish before sliding in.
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.overlaySwap) {
-                [weak self] in self?.openDrawer = side
+                [weak self] in
+                Perf.drawer.emitEvent("openDrawer.commit", "deferred \(Self.overlaySwap)s")
+                self?.openDrawer = side
+                Perf.drawer.endInterval("openDrawer", state, "deferred")
             }
         } else {
+            Perf.drawer.emitEvent("openDrawer.commit", "immediate")
             openDrawer = side
+            Perf.drawer.endInterval("openDrawer", state, "immediate")
         }
     }
 
@@ -555,6 +578,15 @@ final class AppModel: ObservableObject {
         // actually on screen (panel sheets use the same gating as drawers —
         // e.g. the Finisher-effect stops that live inside the Effects panel).
         if openDrawer != nextStop.drawer || activePanel != nextStop.panel {
+            // Both delay paths land here — the plain drawer stops AND the
+            // sheet-hosted Finisher-effect stops (nextStop.panel != nil).
+            // The message distinguishes them in the trace, so you can see a
+            // sheet-hosted stop paying the sheet presentation on top of the
+            // same 0.45s wait.
+            let hosted = nextStop.panel.map { "sheet:\($0.rawValue)" } ?? "drawer"
+            let state = Perf.coach.beginInterval(
+                "coachTransition", id: Perf.coach.makeSignpostID(),
+                "stop \(next) \(hosted) delay 0.45s")
             isTutorialTransitioning = true
             openDrawer = nextStop.drawer
             activePanel = nextStop.panel
@@ -566,11 +598,18 @@ final class AppModel: ObservableObject {
             // are the resting positions — but the fade must not race the
             // preference update of newly appearing drawer/sheet content.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-                guard let self, self.coachIndex == index else { return }   // skipped?
+                guard let self, self.coachIndex == index else {
+                    Perf.coach.endInterval("coachTransition", state, "skipped")
+                    return
+                }
                 self.isTutorialTransitioning = false
                 withAnimation(Theme.fade) { self.coachIndex = next }
+                Perf.coach.endInterval("coachTransition", state, "spotlight-active")
             }
         } else {
+            // No drawer/sheet change: spotlight moves immediately. Shows up
+            // as a point event so the two paths are distinguishable.
+            Perf.coach.emitEvent("coachAdvance", "stop \(next) no-transition")
             withAnimation(Theme.fade) { coachIndex = next }
         }
     }

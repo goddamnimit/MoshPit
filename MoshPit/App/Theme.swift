@@ -52,14 +52,29 @@ enum Theme {
     /// UIImpactFeedbackGenerator per tap spins up the Taptic Engine on the
     /// first impact, adding perceptible latency to the tap it accompanies.
     private static let impactGenerator: UIImpactFeedbackGenerator = {
-        let g = UIImpactFeedbackGenerator(style: .light)
-        g.prepare()
-        return g
+        // `hapticColdStart` fires EXACTLY ONCE per process (lazy static), and
+        // only on the first tap that requests feedback. Its width is the
+        // Taptic Engine spin-up cost. If the trace shows it inside the first
+        // button tap's interval, that tap paid for the warm-up; if it stands
+        // alone early in the trace, pre-warming is already working.
+        Perf.haptics.measure("hapticColdStart", "alloc + first prepare") {
+            let g = UIImpactFeedbackGenerator(style: .light)
+            g.prepare()
+            return g
+        }
     }()
 
     static func haptic() {
-        impactGenerator.impactOccurred()
-        impactGenerator.prepare()   // keep the engine warm for the next tap
+        // Two nested intervals so trigger cost is separable from the
+        // keep-warm prepare() that follows it.
+        Perf.haptics.measure("hapticTrigger") {
+            Perf.haptics.measure("hapticImpact") {
+                impactGenerator.impactOccurred()
+            }
+            Perf.haptics.measure("hapticPrepare", "keep-warm") {
+                impactGenerator.prepare()   // keep the engine warm for the next tap
+            }
+        }
     }
 }
 

@@ -126,6 +126,13 @@ struct CoachOverlay: View {
     @State private var lastTarget: CGRect? = nil
 
     var body: some View {
+        // Both CoachOverlay instances are instrumented and self-identify in
+        // the trace message: "root" is the RootView-hosted overlay (drawer
+        // stops), "sheet:Effects" is the one hosted inside the Effects panel
+        // for the Finisher-effect coach marks. Seeing both lanes rebuild is
+        // how you confirm the sheet-hosted delay path is live.
+        perfBody(Perf.coach, "CoachOverlay.body",
+                 hostPanel.map { "sheet:\($0.rawValue)" } ?? "root") {
         if let index = app.coachIndex, index < CoachScript.stops.count,
            CoachScript.stops[index].panel == hostPanel {
             let stop = CoachScript.stops[index]
@@ -187,6 +194,7 @@ struct CoachOverlay: View {
             // inset — subtle in the simulator, glaring on device.
             .ignoresSafeArea()
             .transition(.opacity)
+        }
         }
     }
 

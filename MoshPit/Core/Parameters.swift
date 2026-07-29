@@ -279,19 +279,42 @@ final class ParameterStore: ObservableObject {
     }
 
     func set(_ id: ParameterID, _ raw: Float, origin: ParameterOrigin = .ui) {
+        // `paramSet` = the whole write, lock included. Nested inside it,
+        // `paramNotify` = only the fan-out to observers. The gap between the
+        // two widths is the tell: ParameterStore has NO per-parameter
+        // publishers — a single write sends one bare `objectWillChange`,
+        // which invalidates every view observing the store regardless of
+        // which parameter moved. If `paramNotify` dominates `paramSet` and
+        // drawer/panel body intervals spike right after it, that's the broad
+        // invalidation confirmed. (Not fixed here — observation only.)
+        let setState = Perf.params.beginInterval(
+            "paramSet", id: Perf.params.makeSignpostID(),
+            "\(id.rawValue) origin=\(origin.rawValue)")
+        defer { Perf.params.endInterval("paramSet", setState) }
+
         let value = min(max(raw, id.range.lowerBound), id.range.upperBound)
         os_unfair_lock_lock(&lock)
         let old = values[id]
         values[id] = value
         os_unfair_lock_unlock(&lock)
-        guard old != value else { return }
-        Perf.event("paramSet", "\(id.rawValue) \(origin.rawValue)")
+        guard old != value else {
+            Perf.params.emitEvent("paramSet.noop", "\(id.rawValue) unchanged")
+            return
+        }
         let change = ParameterChange(id: id, value: value, origin: origin)
         if Thread.isMainThread {
-            objectWillChange.send(); changes.send(change)
+            Perf.params.measure("paramNotify", "\(id.rawValue) sync-main") {
+                objectWillChange.send(); changes.send(change)
+            }
         } else {
+            // Off-main writes (render thread, MIDI) hop to main — the hop
+            // latency is the distance between this event and the interval.
+            Perf.params.emitEvent("paramNotify.hop", "\(id.rawValue) off-main")
             DispatchQueue.main.async { [weak self] in
-                self?.objectWillChange.send(); self?.changes.send(change)
+                guard let self else { return }
+                Perf.params.measure("paramNotify", "\(id.rawValue) async-main") {
+                    self.objectWillChange.send(); self.changes.send(change)
+                }
             }
         }
     }

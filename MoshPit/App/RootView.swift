@@ -436,6 +436,7 @@ private struct RightDrawer: View {
     let onTouch: () -> Void
 
     var body: some View {
+        perfBody(Perf.drawer, "RightDrawer.body") {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: Theme.g1) {
                 if app.params.mode == .clean {
@@ -467,6 +468,7 @@ private struct RightDrawer: View {
         .ignoresSafeArea(edges: .vertical)
         .simultaneousGesture(DragGesture(minimumDistance: 0)
             .onChanged { _ in onTouch() })
+        }
     }
 }
 
@@ -500,9 +502,13 @@ struct ModeParamList: View {
     }
 
     var body: some View {
-        VStack(spacing: Theme.g1) {
-            ForEach(rows, id: \.0) { row in
-                ParamRow(id: row.0, label: row.1, steps: row.2, compact: compact)
+        // Rebuild count is the signal here: this list observes ParameterStore,
+        // so one `objectWillChange` from ANY parameter rebuilds every row.
+        perfBody(Perf.drawer, "ModeParamList.body", "rows \(rows.count)") {
+            VStack(spacing: Theme.g1) {
+                ForEach(rows, id: \.0) { row in
+                    ParamRow(id: row.0, label: row.1, steps: row.2, compact: compact)
+                }
             }
         }
     }
@@ -517,6 +523,7 @@ private struct LeftDrawer: View {
     let onTouch: () -> Void
 
     var body: some View {
+        perfBody(Perf.drawer, "LeftDrawer.body") {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: Theme.g1) {
                 modeButtons.coachAnchor(.modeList)
@@ -534,6 +541,7 @@ private struct LeftDrawer: View {
         .ignoresSafeArea(edges: .vertical)
         .simultaneousGesture(DragGesture(minimumDistance: 0)
             .onChanged { _ in onTouch() })
+        }
     }
 
     private var modeButtons: some View {
@@ -922,27 +930,41 @@ struct ParamRow: View {
             }
             .gesture(DragGesture(minimumDistance: Theme.gHalf)
                 .onChanged { g in
-                    if dragStartValue == nil {
-                        dragSignpost = Perf.begin("paramRowDrag")
-                        dragStartValue = params.getNormalized(id)
-                        if app.highlightParam == id { app.highlightParam = nil }
-                    }
-                    // Fine-adjust: vertical distance from touch-down damps
-                    // sensitivity (48pt away = half speed, and so on).
-                    let dy = abs(Float(g.translation.height))
-                    fineFactor = max(0.05, 1 / (1 + dy / Float(Theme.g6)))
-                    let dx = Float(g.translation.width / w)
-                    let n = min(max(dragStartValue! + dx * fineFactor, 0), 1)
-                    if steps != nil {
-                        let r = id.range
-                        let value = (r.lowerBound + n * (r.upperBound - r.lowerBound)).rounded()
-                        params.set(id, value, origin: .ui)
-                    } else {
-                        params.setNormalized(id, n, origin: .ui)
+                    // Per-tick interval: ONE bar per gesture callback, so the
+                    // trace shows both how often SwiftUI delivers ticks and
+                    // how much main-thread work each one costs. Nested inside
+                    // it you'll see Params.Publish paramSet/paramNotify, and
+                    // downstream of those the drawer/panel body rebuilds —
+                    // that chain is the "sticky slider" hypothesis, top to
+                    // bottom, in one trace.
+                    Perf.slider.measure("sliderTick", "\(id.rawValue)") {
+                        if dragStartValue == nil {
+                            dragSignpost = Perf.slider.beginInterval(
+                                "paramRowDrag", id: Perf.slider.makeSignpostID(),
+                                "\(id.rawValue)")
+                            dragStartValue = params.getNormalized(id)
+                            if app.highlightParam == id { app.highlightParam = nil }
+                        }
+                        // Fine-adjust: vertical distance from touch-down damps
+                        // sensitivity (48pt away = half speed, and so on).
+                        let dy = abs(Float(g.translation.height))
+                        fineFactor = max(0.05, 1 / (1 + dy / Float(Theme.g6)))
+                        let dx = Float(g.translation.width / w)
+                        let n = min(max(dragStartValue! + dx * fineFactor, 0), 1)
+                        if steps != nil {
+                            let r = id.range
+                            let value = (r.lowerBound + n * (r.upperBound - r.lowerBound)).rounded()
+                            params.set(id, value, origin: .ui)
+                        } else {
+                            params.setNormalized(id, n, origin: .ui)
+                        }
                     }
                 }
                 .onEnded { _ in
-                    if let s = dragSignpost { Perf.end("paramRowDrag", s); dragSignpost = nil }
+                    if let s = dragSignpost {
+                        Perf.slider.endInterval("paramRowDrag", s)
+                        dragSignpost = nil
+                    }
                     dragStartValue = nil; fineFactor = 1
                 })
         }
