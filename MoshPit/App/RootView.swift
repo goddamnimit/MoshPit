@@ -823,7 +823,7 @@ private struct ShareToastView: View {
             if let url = item.shareURL {
                 Button {
                     app.dismissShareToast()
-                    ShareSheetPresenter.present(fileURL: url)
+                    app.shareFile(url)
                 } label: {
                     Text("Share").padding(.horizontal, Theme.g1)
                 }

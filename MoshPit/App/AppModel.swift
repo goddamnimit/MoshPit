@@ -77,6 +77,15 @@ final class AppModel: ObservableObject {
     /// defaults to Pro under XCTest). nil = read ProManager.shared.
     private var debugProOverride: Bool?
     func debugSetPro(_ isPro: Bool?) { debugProOverride = isPro }
+    /// DEBUG-only free-tier preview (Output panel toggle): makes entitled()
+    /// read false so the watermark and the unlock sheet can be seen on a
+    /// development build. debugSetPro(_:) still takes precedence. Does not
+    /// exist in Release.
+    @Published var debugPreviewFreeTier: Bool =
+        UserDefaults.standard.bool(forKey: "moshpit.debug.previewFreeTier") {
+        didSet { UserDefaults.standard.set(debugPreviewFreeTier,
+                                           forKey: "moshpit.debug.previewFreeTier") }
+    }
     #endif
 
     enum Panel: String, Identifiable, CaseIterable {
@@ -173,7 +182,11 @@ final class AppModel: ObservableObject {
         // stop() time on main. Everything else about recording — quality,
         // formats, the session gallery, sharing — is free.
         recorder.allowsSaveToPhotos = { [weak self] in
-            self?.entitled(.saveVideoToPhotos) ?? true
+            self?.entitled(.saveVideoToPhotos) ?? false
+        }
+        // Free tier: recordings are watermarked. Latched at record start.
+        recorder.watermarkRequired = { [weak self] in
+            self?.watermarkRequired() ?? true
         }
         // Recording finished: build the gallery entry (thumbnail/duration/
         // size — blocking, so off main) and surface the Saved/Share toast —
@@ -192,10 +205,11 @@ final class AppModel: ObservableObject {
                         self.showShareToast("Saved to session gallery — enable Photos access in Settings",
                                             shareURL: url)
                     case .gated:
-                        self.showShareToast("Saved to session gallery", shareURL: url)
-                        self.presentUpgrade(for: .saveVideoToPhotos) { [weak self] in
-                            self?.saveVideoToPhotos(url: url)
-                        }
+                        // Free tier: watermarked clip stays in the gallery.
+                        // No auto-paywall; Share on this toast routes to the
+                        // unlock sheet via requireExport.
+                        self.showShareToast("Saved to gallery with watermark — unlock to export",
+                                            shareURL: url)
                     }
                 }
             }
@@ -257,6 +271,7 @@ final class AppModel: ObservableObject {
     private func entitled(_ capability: Capability) -> Bool {
         #if DEBUG
         if let debugProOverride { return debugProOverride }
+        if debugPreviewFreeTier { return false }
         // DEBUG-only: bypasses the save-to-Photos paywall for local
         // development — every capability reads as unlocked, so the
         // UpgradeSheet never presents. Not present in Release builds
@@ -266,6 +281,22 @@ final class AppModel: ObservableObject {
         #else
         return MainActor.assumeIsolated { ProManager.shared.allows(capability) }
         #endif
+    }
+
+    /// True when a recording/snapshot started now must be watermarked.
+    func watermarkRequired() -> Bool { !entitled(.removeWatermark) }
+
+    /// Runs `action` if exporting is unlocked; otherwise shows the unlock
+    /// sheet and keeps `action` pending until the purchase completes.
+    /// Every share / save / social-export entry point goes through here.
+    func requireExport(_ action: @escaping () -> Void) {
+        if entitled(.exportOutput) { action() }
+        else { presentUpgrade(for: .exportOutput, andThen: action) }
+    }
+
+    /// Gated share sheet (the only app-level way to present it).
+    func shareFile(_ url: URL) {
+        requireExport { ShareSheetPresenter.present(fileURL: url) }
     }
 
     /// React to entitlement flips: dismiss the sheet and complete the
@@ -464,7 +495,8 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(Theme.fade) { self.snapshotFlash = false }
         }
-        renderer.requestSnapshot { [weak self] texture in
+        let watermark = watermarkRequired()   // decided at shutter time
+        renderer.requestSnapshot(watermark: watermark) { [weak self] texture in
             DispatchQueue.global(qos: .userInitiated).async {
                 guard let texture, let image = SnapshotSaver.image(from: texture) else {
                     DispatchQueue.main.async { self?.showToast("Snapshot failed") }
@@ -474,6 +506,15 @@ final class AppModel: ObservableObject {
                 // the session sweep, same lifecycle as recordings).
                 let pngURL = SessionClipStore.snapshotURL()
                 let wrote = (try? image.pngData()?.write(to: pngURL)) != nil
+                if watermark {
+                    // Free tier: watermarked, never written to Photos. Share
+                    // on the toast routes to the unlock sheet.
+                    DispatchQueue.main.async {
+                        self?.showShareToast("Snapshot has a watermark — unlock to save",
+                                             shareURL: wrote ? pngURL : nil)
+                    }
+                    return
+                }
                 SnapshotSaver.save(image) {
                     self?.showToast("Enable Photos access in Settings")
                 } onSaved: {

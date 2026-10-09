@@ -455,7 +455,7 @@ final class SmokeTests: XCTestCase {
         var actualW = 0
         var actualH = 0
 
-        renderer.requestSnapshot { texture in
+        renderer.requestSnapshot(watermark: false) { texture in
             DispatchQueue.global().async {
                 guard let texture = texture else {
                     XCTFail("Snapshot returned nil texture")

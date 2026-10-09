@@ -2,6 +2,7 @@ import XCTest
 import StoreKit
 import StoreKitTest
 import UIKit
+import MetalKit
 @testable import MoshPit
 
 /// Save-to-Photos paywall tests: the single Capability gate, the offline
@@ -49,7 +50,7 @@ final class StoreTests: XCTestCase {
 
     // MARK: - 2. The save-to-Photos gate
 
-    func testFreeUserStopTriggersUpgradeAndSkipsPhotos() async throws {
+    func testFreeUserStopKeepsWatermarkedClipAndSkipsPhotos() async throws {
         let app = AppModel()
         try XCTSkipIf(app.ctx == nil, "Metal unavailable")
         var photosSaveAttempted = false
@@ -62,9 +63,12 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(app.recorder?.isRecording, true)
         app.recorder?.stop()
 
-        await waitUntil { app.showUpgradeSheet }
-        XCTAssertTrue(app.showUpgradeSheet, "gated save must present the upgrade sheet")
-        XCTAssertFalse(photosSaveAttempted, "gated save must never touch the Photos path")
+        // (No frames were rendered, so no gallery thumbnail is produced; the
+        // gated-outcome toast still fires and is what we observe.)
+        await waitUntil { app.shareToast != nil }
+        XCTAssertTrue(app.shareToast?.message.contains("watermark") == true)
+        XCTAssertFalse(photosSaveAttempted, "free recording never touches Photos")
+        XCTAssertFalse(app.showUpgradeSheet, "no auto-paywall after recording")
     }
 
     func testEntitledUserStopSavesToPhotos() async throws {
@@ -99,7 +103,8 @@ final class StoreTests: XCTestCase {
 
     // MARK: - 3. Snapshot saving is NOT gated
 
-    func testSnapshotSaveIsFreeForEveryone() async {
+    /// The saver itself carries no gate; AppModel.snapshot() decides (below).
+    func testSnapshotSaverItselfIsUngated() async {
         let app = AppModel()
         app.debugSetPro(false)
         var snapshotSaved = false
@@ -115,6 +120,71 @@ final class StoreTests: XCTestCase {
         await fulfillment(of: [saved], timeout: 5)
         XCTAssertTrue(snapshotSaved, "photo snapshot saving is ungated")
         XCTAssertFalse(app.showUpgradeSheet, "snapshot save must not upsell")
+    }
+
+    func testFreeSnapshotIsWatermarkedAndNotSavedToPhotos() async throws {
+        let app = AppModel()
+        try XCTSkipIf(app.renderer == nil, "Metal unavailable")
+        app.sources?.setTestPattern(slot: .a, inverted: false, portrait: false)
+        var savedToPhotos = false
+        SnapshotSaver.debugSaveHook = { _ in savedToPhotos = true }
+        app.debugSetPro(false)
+        let view = MTKView(frame: CGRect(x: 0, y: 0, width: 320, height: 180),
+                           device: app.ctx?.device)
+        view.drawableSize = CGSize(width: 320, height: 180)
+        app.snapshot()
+        app.renderer?.draw(in: view)
+        await waitUntil { app.shareToast != nil }
+        XCTAssertTrue(app.shareToast?.message.contains("watermark") == true,
+                      "free snapshot is flagged as watermarked")
+        XCTAssertFalse(savedToPhotos, "free snapshot never reaches Photos")
+        app.dismissShareToast()
+
+        app.debugSetPro(true)
+        app.snapshot()
+        app.renderer?.draw(in: view)
+        await waitUntil { savedToPhotos }
+        XCTAssertTrue(savedToPhotos, "entitled snapshot saves clean to Photos")
+        app.debugSetPro(nil)
+    }
+
+    // MARK: - 3b. Export gate (share / social export / save)
+
+    func testRequireExportGatesFreeUsersAndRunsForEntitled() {
+        let app = AppModel()
+        app.debugSetPro(false)
+        var ran = false
+        app.requireExport { ran = true }
+        XCTAssertFalse(ran, "free user must not export")
+        XCTAssertTrue(app.showUpgradeSheet, "free user is shown the unlock sheet")
+        app.completePendingProAction()   // purchase completes
+        XCTAssertTrue(ran, "the blocked export resumes after unlock")
+
+        let entitled = AppModel()
+        entitled.debugSetPro(true)
+        var ranEntitled = false
+        entitled.requireExport { ranEntitled = true }
+        XCTAssertTrue(ranEntitled)
+        XCTAssertFalse(entitled.showUpgradeSheet)
+    }
+
+    func testDebugBypassOpensExportsAndPreviewToggleClosesThem() {
+        let app = AppModel()
+        app.debugSetPro(nil)
+        app.debugPreviewFreeTier = false
+        var ran = false
+        app.requireExport { ran = true }
+        XCTAssertTrue(ran, "Debug builds are fully entitled")
+        app.debugPreviewFreeTier = true
+        ran = false
+        app.requireExport { ran = true }
+        XCTAssertFalse(ran, "DEBUG free-tier preview gates exports")
+        XCTAssertTrue(app.showUpgradeSheet)
+        app.debugSetPro(true)           // debugSetPro takes precedence
+        app.showUpgradeSheet = false
+        app.requireExport { ran = true }
+        XCTAssertTrue(ran)
+        app.debugPreviewFreeTier = false
     }
 
     // MARK: - 4. Share sheet is free; only its Save Video action is excluded
@@ -173,8 +243,9 @@ final class StoreTests: XCTestCase {
     // MARK: - 8. Nothing else interacts with the gate
 
     func testOnlySaveToPhotosIsGated() {
-        XCTAssertEqual(Capability.allCases, [.saveVideoToPhotos],
-                       "the gating surface is exactly one capability")
+        XCTAssertEqual(Capability.allCases,
+                       [.saveVideoToPhotos, .removeWatermark, .exportOutput],
+                       "the gating surface is exactly these capabilities (one entitlement)")
         // Formerly-gated features are free: parameter writes, mode selection,
         // and export settings all work for a free user with no upgrade sheet.
         let app = AppModel()

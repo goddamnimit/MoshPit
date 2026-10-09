@@ -50,17 +50,20 @@ final class MoshRenderer: NSObject, MTKViewDelegate {
     /// BGRA texture inside the frame's own command buffer (no stall) and the
     /// handler fires from its completion — read bytes there, off the render
     /// path. Captures the post-finisher frame: what you see is what you save.
-    private var snapshotHandler: ((MTLTexture?) -> Void)?
+    private var snapshotRequest: (watermark: Bool, handler: (MTLTexture?) -> Void)?
     private var snapshotTex: MTLTexture?
 
-    func requestSnapshot(_ handler: @escaping (MTLTexture?) -> Void) {
-        snapshotHandler = handler
+    /// `watermark` is decided by the caller at shutter time (free tier).
+    func requestSnapshot(watermark: Bool = true,
+                         _ handler: @escaping (MTLTexture?) -> Void) {
+        snapshotRequest = (watermark, handler)
     }
 
     private func encodeSnapshotIfNeeded(commandBuffer cb: MTLCommandBuffer,
                                         final: MTLTexture) {
-        guard let handler = snapshotHandler else { return }
-        snapshotHandler = nil
+        guard let request = snapshotRequest else { return }
+        snapshotRequest = nil
+        let handler = request.handler
         if snapshotTex == nil || snapshotTex!.width != final.width
             || snapshotTex!.height != final.height {
             let d = MTLTextureDescriptor.texture2DDescriptor(
@@ -77,9 +80,8 @@ final class MoshRenderer: NSObject, MTKViewDelegate {
         }
         if let enc = cb.makeComputeCommandEncoder() {
             enc.label = "snapshot.blit"
-            enc.setTexture(final, index: 0)
-            enc.setTexture(dst, index: 1)
-            ctx.dispatch(enc, "blitScale", width: dst.width, height: dst.height)
+            ctx.encodeOutputBlit(enc, input: final, output: dst,
+                                 watermarked: request.watermark)
             enc.endEncoding()
         }
         cb.addCompletedHandler { _ in handler(dst) }

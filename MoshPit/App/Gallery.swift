@@ -68,8 +68,12 @@ struct GalleryPanel: View {
     }
 
     private func socialExport(_ clip: SessionClip) {
+        app.requireExport { exportGated(clip) }
+    }
+
+    private func exportGated(_ clip: SessionClip) {
         exporter.export(clipURL: clip.url) { url in
-            if let url { ShareSheetPresenter.present(fileURL: url) }
+            if let url { app.shareFile(url) }
         }
     }
 }
@@ -117,7 +121,7 @@ private struct ClipRow: View {
 
             Menu {
                 Button {
-                    ShareSheetPresenter.present(fileURL: clip.url)
+                    app.shareFile(clip.url)
                 } label: { Label("Share", systemImage: "square.and.arrow.up") }
                 Button {
                     app.loadClipIntoSlotA(clip)

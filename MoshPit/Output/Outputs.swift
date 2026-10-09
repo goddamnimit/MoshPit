@@ -50,6 +50,13 @@ final class MoshRecorder: NSObject, ObservableObject,
     /// recorder itself knows nothing about StoreKit — AppModel injects the
     /// entitlement check.
     var allowsSaveToPhotos: (() -> Bool)?
+    /// Whether a recording started NOW must carry the free-tier watermark.
+    /// Consulted once in start() and latched for that recording (a purchase
+    /// mid-recording never cleans it). nil fails CLOSED (watermarked).
+    var watermarkRequired: (() -> Bool)?
+    /// The latched decision for the current/last recording (read on the
+    /// render thread in consume(); written on main in start()).
+    private(set) var watermarkLatched = true
     /// Fires (any thread) when an unsupported codec config fell back to HEVC.
     var onFallbackNotice: ((String) -> Void)?
 
@@ -74,6 +81,7 @@ final class MoshRecorder: NSObject, ObservableObject,
                codec codecType: AVVideoCodecType? = nil) {
         guard !isRecording else { return }
         lastError = nil
+        watermarkLatched = watermarkRequired?() ?? true
         let url = SessionClipStore.recordingURL()
         do {
             let writer = try AVAssetWriter(url: url, fileType: .mov)
@@ -178,9 +186,8 @@ final class MoshRecorder: NSObject, ObservableObject,
         guard let dst = cvTex.flatMap(CVMetalTextureGetTexture) else { return }
         if let enc = cb.makeComputeCommandEncoder() {
             enc.label = "output.blit"
-            enc.setTexture(texture, index: 0)
-            enc.setTexture(dst, index: 1)
-            ctx.dispatch(enc, "blitScale", width: dst.width, height: dst.height)
+            ctx.encodeOutputBlit(enc, input: texture, output: dst,
+                                 watermarked: watermarkLatched)
             enc.endEncoding()
         }
         cb.addCompletedHandler { [weak self] _ in
@@ -201,7 +208,8 @@ final class MoshRecorder: NSObject, ObservableObject,
         // Entitlement checked ONCE here (main thread) and latched — a
         // purchase completing mid-finalize doesn't change this artifact's
         // outcome; the pending-save flow re-saves it explicitly.
-        let saveAllowed = allowsSaveToPhotos?() ?? true
+        // A watermarked (free-tier) recording is never auto-saved to Photos.
+        let saveAllowed = !watermarkLatched && (allowsSaveToPhotos?() ?? true)
         writer.finishWriting { [weak self] in
             do {
                 let audioSession = AVAudioSession.sharedInstance()

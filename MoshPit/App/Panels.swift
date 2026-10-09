@@ -656,7 +656,7 @@ struct OutputPanel: View {
     var body: some View {
         List {
             Section("Recording") {
-                Button(app.recorder?.isRecording == true ? "■ Stop & save to Photos" : "● Record") {
+                Button(app.recorder?.isRecording == true ? "■ Stop" : "● Record") {
                     app.toggleRecord()
                 }
                 .tint(app.recorder?.isRecording == true ? Theme.accent : Theme.textPrimary)
@@ -668,6 +668,12 @@ struct OutputPanel: View {
                     }
                 }
             }
+            #if DEBUG
+            Section("Debug") {
+                Toggle("Preview free tier (watermark + paywall)",
+                       isOn: $app.debugPreviewFreeTier)
+            }
+            #endif
             ExportSettingsSection(settings: app.recordingSettings)
             Section("MJPEG network stream") {
                 if let mjpeg = app.mjpeg {

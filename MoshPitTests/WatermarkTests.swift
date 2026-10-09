@@ -1,0 +1,178 @@
+import XCTest
+import Metal
+@testable import MoshPit
+
+/// Free-tier watermark: placement math, the GPU pass (pixel-sampled against a
+/// clean render at several resolutions/orientations), the record-start
+/// entitlement latch, and that live outputs stay clean.
+final class WatermarkTests: XCTestCase {
+
+    private let sizes: [(Int, Int)] = [(1280, 720), (1920, 1080), (720, 1280),
+                                       (1080, 1920), (3840, 2160)]
+
+    // MARK: Placement math
+
+    func testRectIsBottomRightAndScalesWithShortEdge() {
+        for (w, h) in sizes {
+            let r = WatermarkOverlay.rect(width: w, height: h)
+            let short = CGFloat(min(w, h))
+            XCTAssertGreaterThan(r.minX, CGFloat(w) / 2, "\(w)x\(h): right half")
+            XCTAssertGreaterThan(r.minY, CGFloat(h) / 2, "\(w)x\(h): bottom half")
+            XCTAssertLessThan(r.maxX, CGFloat(w), "\(w)x\(h): inside right margin")
+            XCTAssertLessThan(r.maxY, CGFloat(h), "\(w)x\(h): inside bottom margin")
+            XCTAssertEqual(r.height / short, WatermarkOverlay.heightFraction, accuracy: 0.002)
+            XCTAssertEqual(CGFloat(w) - r.maxX, CGFloat(h) - r.maxY, accuracy: 1,
+                           "equal margins")
+        }
+    }
+
+    // MARK: GPU pass vs clean render
+
+    private func render(ctx: MetalContext, width: Int, height: Int,
+                        watermarked: Bool) -> [UInt8]? {
+        let inD = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+        inD.usage = .shaderRead
+        inD.storageMode = .shared
+        guard let input = ctx.device.makeTexture(descriptor: inD) else { return nil }
+        let fill = [UInt8](repeating: 77, count: width * height * 4)   // flat dark gray
+        input.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0,
+                      withBytes: fill, bytesPerRow: width * 4)
+        let outD = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+        outD.usage = [.shaderRead, .shaderWrite]
+        outD.storageMode = .shared
+        guard let out = ctx.device.makeTexture(descriptor: outD),
+              let cb = ctx.queue.makeCommandBuffer(),
+              let enc = cb.makeComputeCommandEncoder() else { return nil }
+        ctx.encodeOutputBlit(enc, input: input, output: out, watermarked: watermarked)
+        enc.endEncoding()
+        cb.commit()
+        cb.waitUntilCompleted()
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        out.getBytes(&bytes, bytesPerRow: width * 4,
+                     from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+        return bytes
+    }
+
+    func testWatermarkOnlyChangesTheCornerAtEverySize() throws {
+        let ctx = try XCTUnwrap(MetalContext(), "Metal unavailable")
+        for (w, h) in sizes {
+            let clean = try XCTUnwrap(render(ctx: ctx, width: w, height: h, watermarked: false))
+            let marked = try XCTUnwrap(render(ctx: ctx, width: w, height: h, watermarked: true))
+            let rect = WatermarkOverlay.rect(width: w, height: h).insetBy(dx: -8, dy: -8)
+            var changedInside = 0
+            var changedOutside = 0
+            var brightened = 0
+            for y in 0..<h {
+                for x in 0..<w {
+                    let i = (y * w + x) * 4
+                    if clean[i] != marked[i] || clean[i + 1] != marked[i + 1]
+                        || clean[i + 2] != marked[i + 2] {
+                        if rect.contains(CGPoint(x: x, y: y)) { changedInside += 1 }
+                        else { changedOutside += 1 }
+                        if marked[i] > clean[i] + 40 { brightened += 1 }
+                    }
+                }
+            }
+            XCTAssertEqual(changedOutside, 0, "\(w)x\(h): nothing outside the corner may change")
+            XCTAssertGreaterThan(changedInside, 100, "\(w)x\(h): the mark must be drawn")
+            XCTAssertGreaterThan(brightened, 50, "\(w)x\(h): wordmark is light on dark")
+            // Clean render stays a flat copy of the input.
+            XCTAssertTrue(clean.allSatisfy { $0 == 77 || $0 == 255 }, "\(w)x\(h): clean pass-through")
+        }
+    }
+
+    // MARK: Entitlement latched at record start
+
+    func testRecorderLatchesWatermarkAtStart() throws {
+        let ctx = try XCTUnwrap(MetalContext(), "Metal unavailable")
+        let rec = MoshRecorder(ctx: ctx)
+        var required = true
+        rec.watermarkRequired = { required }
+        rec.start(width: 64, height: 64)
+        XCTAssertTrue(rec.watermarkLatched)
+        required = false                     // user "buys" mid-recording
+        XCTAssertTrue(rec.watermarkLatched, "free recording stays watermarked")
+        rec.stop()
+
+        rec.start(width: 64, height: 64)     // next recording sees the new state
+        XCTAssertFalse(rec.watermarkLatched)
+        required = true                      // refund / toggle mid-recording
+        XCTAssertFalse(rec.watermarkLatched, "entitled recording stays clean")
+        rec.stop()
+    }
+
+    func testRecorderFailsClosedWithoutGate() throws {
+        let ctx = try XCTUnwrap(MetalContext(), "Metal unavailable")
+        let rec = MoshRecorder(ctx: ctx)
+        rec.start(width: 64, height: 64)
+        XCTAssertTrue(rec.watermarkLatched)
+        rec.stop()
+    }
+
+    // MARK: AppModel decisions
+
+    @MainActor
+    func testAppModelWatermarkFollowsEntitlement() {
+        let app = AppModel()
+        app.debugSetPro(false)
+        XCTAssertTrue(app.watermarkRequired())
+        app.debugSetPro(true)
+        XCTAssertFalse(app.watermarkRequired())
+        // nil = DEBUG bypass: entitled, no watermark.
+        app.debugSetPro(nil)
+        app.debugPreviewFreeTier = false
+        XCTAssertFalse(app.watermarkRequired(), "Debug build is fully entitled")
+        // DEBUG free-tier preview forces the free tier...
+        app.debugPreviewFreeTier = true
+        XCTAssertTrue(app.watermarkRequired())
+        // ...but debugSetPro still wins.
+        app.debugSetPro(true)
+        XCTAssertFalse(app.watermarkRequired())
+        app.debugSetPro(nil)
+        app.debugPreviewFreeTier = false
+    }
+
+    @MainActor
+    func testRecordingStartedFreeStaysWatermarkedAfterUnlock() throws {
+        let app = AppModel()
+        try XCTSkipIf(app.recorder == nil, "Metal unavailable")
+        app.debugSetPro(false)
+        app.recorder?.start(width: 64, height: 64)
+        XCTAssertEqual(app.recorder?.watermarkLatched, true)
+        app.debugSetPro(true)
+        XCTAssertEqual(app.recorder?.watermarkLatched, true)
+        app.recorder?.stop()
+        app.debugSetPro(nil)
+    }
+
+    // MARK: Live outputs stay clean
+
+    func testOnlyRecorderAndSnapshotUseTheWatermarkKernel() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("MoshPit")
+        let fm = FileManager.default
+        var users: [String] = []
+        for case let url as URL in fm.enumerator(at: root, includingPropertiesForKeys: nil)! {
+            guard url.pathExtension == "swift",
+                  let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            if text.contains("encodeOutputBlit(") || text.contains("blitScaleWatermark") {
+                users.append(url.lastPathComponent)
+            }
+        }
+        XCTAssertEqual(Set(users), ["Watermark.swift", "Outputs.swift", "Renderer.swift",
+                                    "MetalContext.swift"])
+        // NDI / MJPEG consumers use the plain blit: Outputs.swift's only
+        // encodeOutputBlit call is inside MoshRecorder.consume.
+        let outputs = try String(contentsOf: root.appendingPathComponent("Output/Outputs.swift"),
+                                 encoding: .utf8)
+        XCTAssertEqual(outputs.components(separatedBy: "encodeOutputBlit(").count - 1, 1)
+        let recorderRange = try XCTUnwrap(outputs.range(of: "func consume(texture"))
+        let mjpegRange = try XCTUnwrap(outputs.range(of: "final class MJPEGServer"))
+        let callRange = try XCTUnwrap(outputs.range(of: "encodeOutputBlit("))
+        XCTAssertTrue(recorderRange.lowerBound < callRange.lowerBound
+                      && callRange.lowerBound < mjpegRange.lowerBound)
+    }
+}

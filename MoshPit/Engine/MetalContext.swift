@@ -9,6 +9,8 @@ final class MetalContext {
     let library: MTLLibrary
     private(set) var pipelines: [String: MTLComputePipelineState] = [:]
     let previewPipeline: MTLRenderPipelineState
+    /// Free-tier wordmark (nil only if CoreText rasterization failed).
+    private(set) lazy var watermark: WatermarkOverlay? = WatermarkOverlay(device: device)
 
     init?() {
         guard let device = MTLCreateSystemDefaultDevice(),
@@ -22,7 +24,8 @@ final class MetalContext {
         for name in ["blockMatch", "moshCanvas", "resetCanvas", "motionStats",
                      "echoEffect", "echoStore", "slitscanEffect", "weaverEffect",
                      "pixelSortEffect", "procAmpEffect", "blitScale",
-                     "struktPass", "mixWipe", "finisherPass"] {
+                     "struktPass", "mixWipe", "finisherPass",
+                     "blitScaleWatermark"] {
             guard let fn = library.makeFunction(name: name),
                   let ps = try? device.makeComputePipelineState(function: fn) else { return nil }
             pipelines[name] = ps

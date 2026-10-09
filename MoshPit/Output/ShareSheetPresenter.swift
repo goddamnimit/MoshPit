@@ -14,6 +14,12 @@ enum ShareSheetPresenter {
     /// iMessage / AirDrop.
     static func present(fileURL: URL, from sourceView: UIView? = nil) {
         DispatchQueue.main.async {
+            #if !DEBUG
+            // Release: exporting is part of the unlock. Callers route through
+            // AppModel.shareFile (which shows the unlock sheet); this is the
+            // defence-in-depth backstop so no new call site can leak a file.
+            guard MainActor.assumeIsolated({ ProManager.shared.isPro }) else { return }
+            #endif
             guard let window = UIApplication.shared.connectedScenes
                     .compactMap({ $0 as? UIWindowScene })
                     .flatMap(\.windows)
