@@ -195,7 +195,7 @@ struct ClipPlaybackView: View {
             VStack {
                 HStack {
                     Spacer()
-                    IconButton(systemName: "xmark") { dismiss() }.accessibilityLabel("Close")
+                    IconButton(systemName: "xmark") { dismiss() }
                         .accessibilityLabel("Close")
                 }
                 .padding(.horizontal, Theme.g2)
