@@ -53,8 +53,8 @@ domains, empty collected-data types, UserDefaults/CA92.1 only):
 - **Reference Name:** MoshPit Pro
 - **Display Name (localized, en-US):** MoshPit Pro
   (11 characters; limit 30)
-- **Description (localized, en-US):** Save your recorded videos to Photos.
-  (37 characters; limit 45)
+- **Description (localized, en-US):** Remove watermark. Share and save videos.
+  (40 characters; limit 45)
 - **Price tier:** USD 4.99
 - **Review screenshot:** ⛔ BLOCKED — requires an actual screenshot of the
   in-app upgrade sheet (pending, tomorrow's screenshot task). The product
@@ -181,9 +181,9 @@ wave a hand at the camera; that's the core effect.
 2. Swipe from the left edge for mosh modes; from the right for sliders and
 an XY pad. The circular arrow resets to a clean frame.
 3. Recording: tap record, wave, tap again — the clip lands in the free
-in-app session gallery with a share sheet. Saving recordings directly to
-Photos is the single in-app purchase (below). The shutter (snapshot) button
-saves a still to Photos with no purchase.
+in-app session gallery with a small watermark. Exporting (Share, Save to
+Files/Photos, Share to Social) and watermark-free recordings/snapshots are
+the single in-app purchase (below).
 4. Network output needs NO NDI hardware/software: in the Output panel
 enable "MJPEG Server", then open http://<device-ip>:8080/stream in any
 browser on the same Wi-Fi to see the live output.
@@ -192,19 +192,19 @@ PERMISSIONS
 - Camera: the primary video input; frames are processed on-device and never
 uploaded.
 - Microphone: only while recording, so clips have sound.
-- Photo library add: snapshots (free) and recordings (after Pro unlock).
+- Photo library add: saving recordings and snapshots (after Pro unlock).
 - Photo library read: picking a library video as a mosh source.
 - Local network + Bonjour (_ndi._tcp.): NDI output to VJ software
 (Resolume, OBS, VDMX) and the MJPEG stream above. Prompted only when the
 user enables a network output; no internet/analytics traffic.
 
 IN-APP PURCHASE
-One IAP: "MoshPit Pro" (com.moshpit.app.pro), non-consumable, unlocks
-saving recorded videos to Photos. Everything else — all modes, effects,
-outputs, recording itself, the session gallery, sharing, snapshots — is
-free. When a non-purchaser stops a recording, the clip is kept in the
-session gallery and an upgrade sheet is offered; after purchase (or Restore
-Purchases, on the same sheet) the pending save completes. StoreKit 2;
+One IAP: "MoshPit Pro" (com.moshpit.app.pro), non-consumable, removes
+the watermark from new recordings/snapshots and unlocks exporting. Everything
+else — all modes, effects, sources, NDI/MJPEG, recording, the session gallery
+(view/play/remix/delete) — is free. Free clips are watermarked and stay in
+the app; Share/Save/Social Export show the unlock sheet; after purchase (or
+Restore Purchases, on the same sheet) the pending action completes. StoreKit 2;
 testable with a sandbox Apple account.
 
 OTHER

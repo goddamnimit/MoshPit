@@ -11,7 +11,8 @@
 	     used for on-device app settings (effect order, MIDI CC bindings,
 	     tutorial-seen flag, photosensitivity-warning flag) and the local
 	     Pro-unlock state (StoreKit entitlement launch cache, offline
-	     redeem-code flag). StoreKit 2 itself (Transaction/Product/AppStore)
+	     redeem-code flag). The free-tier watermark and export lock are
+	     purely local rendering/UI behavior: no data is collected or sent. StoreKit 2 itself (Transaction/Product/AppStore)
 	     is not a required-reason API and purchase data is collected and
 	     disclosed by Apple, not by this app. -->
 	<key>NSPrivacyTracking</key>

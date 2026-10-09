@@ -21,11 +21,12 @@ HOW TO TEST WITHOUT ANY SPECIAL HARDWARE
    right edge for sliders and an XY pad. Tap the circular arrow to reset to
    a clean frame.
 3. Recording: tap the record button, wave at the camera, tap again — the
-   clip lands in the free in-app session gallery with a share sheet. Saving
-   recordings directly to Photos is the app's single in-app purchase (see
-   below). The shutter (snapshot) button saves a still image to Photos with
-   no purchase — both saves are what the photo-library-add permission is
-   for.
+   clip lands in the free in-app session gallery with a small "MoshPit"
+   watermark burned in. Free clips can be viewed, played, remixed and
+   deleted in the app; exporting them (Share, Save to Files/Photos, Share to
+   Social) and clean, watermark-free recordings and snapshots require the
+   app's single in-app purchase (see below). The photo-library-add
+   permission is used when an unlocked user saves a recording or snapshot.
 4. Network output does NOT require NDI hardware or NDI software. In the
    Output panel, enable "MJPEG Server", then open
    `http://<device-ip>:8080/stream` in any web browser on a computer on the
@@ -52,13 +53,15 @@ WHY EACH PERMISSION IS REQUESTED
 IN-APP PURCHASE
 
 MoshPit has exactly one IAP: "MoshPit Pro" (`com.moshpit.app.pro`), a
-non-consumable that unlocks saving recorded videos to the Photos library.
-Everything else — all modes, effects, outputs, recording itself, the
-session gallery, sharing, and snapshots — is free. When a non-purchaser
-stops a recording, the clip is kept in the session gallery and an upgrade
-sheet is offered; after purchase (or Restore Purchases, available on the
-same sheet), the pending save completes. Implemented with StoreKit 2;
-testable with a sandbox Apple account.
+non-consumable that removes the watermark from new recordings and
+snapshots and unlocks exporting (Share sheet, Save to Files/Photos, Share to
+Social). Everything else — all modes, effects, sources, NDI/MJPEG output,
+recording, the session gallery (view/play/remix/delete) — is free. To test:
+record a clip, open the Gallery from the left drawer and see the watermark;
+tap the clip's menu > Share (or the Share button on the post-recording
+toast) to see the unlock sheet; a sandbox purchase (or Restore Purchases on
+the same sheet) completes the share. New recordings after unlocking have
+no watermark. StoreKit 2; testable with a sandbox Apple account.
 
 OTHER NOTES
 

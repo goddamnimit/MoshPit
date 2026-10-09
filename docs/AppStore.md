@@ -66,8 +66,9 @@ instant sharing — or grab a single frame with the shutter button.
 NO STRINGS
 No account. No ads. No analytics. No subscriptions. Nothing leaves your
 device unless you point an output at your own network. Every mode, effect,
-and output is free; the one optional purchase is MoshPit Pro, a single
-one-time unlock that saves your recordings directly to Photos.
+and live output is free; recordings you make for free carry a small
+watermark and stay in the app. The one optional purchase, MoshPit Pro, is a
+single one-time unlock that removes the watermark and lets you export.
 
 MoshPit is for VJs, video artists, glitch enthusiasts, and anyone who ever
 deleted an I-frame on purpose.
@@ -92,7 +93,7 @@ Initial release.
 - A/B source mixer with luma and mask wipes
 - MIDI CC learn, automation record/replay, hardware keyboard shortcuts
 - NDI and MJPEG network output; 1080p recording, snapshots, session gallery
-- Optional one-time MoshPit Pro unlock: save recordings straight to Photos
+- Optional one-time MoshPit Pro unlock: no watermark on new recordings, plus sharing and saving
 
 ## In-App Purchases (must be created in App Store Connect)
 
@@ -106,7 +107,7 @@ version and cannot ship separately.
 | Product ID | `com.moshpit.app.pro` (must match `ProManager.productID` exactly) |
 | Reference name | MoshPit Pro |
 | Display name (limit 30) | MoshPit Pro (11 characters) |
-| Description (limit 45) | Save your recorded videos to Photos. (37 characters) |
+| Description (limit 45) | Remove watermark. Share and save videos. (40 characters) |
 | Price | USD 4.99 tier |
 
 Checklist:
