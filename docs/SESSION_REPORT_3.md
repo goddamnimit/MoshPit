@@ -53,3 +53,24 @@ gallery assertions. Builds: Debug + Release simulator, generic iOS Debug + Relea
 ## Not done
 - No device run: hint popovers on small phones, welcome flow, coach alignment, watermark look.
 - UpgradeSheet screenshot for the IAP: no suitable local image exists (see ASC section).
+
+## App Store Connect changes (2026-10-08, browser, signed in by you)
+Done and verified (IAP `com.moshpit.app.pro`, still "Prepare for Submission"):
+- Localized description (en-US): "Save your recorded videos to Photos." -> "Remove watermark. Share and save videos."
+  Display name unchanged ("MoshPit Pro"). Verified after reload.
+- IAP review notes: added the reviewer test steps (988 chars). My first attempt left the text doubled
+  on the server (typing quirk); corrected and re-verified after reload: exactly one copy.
+- NOT touched: price, availability, "Add for Review", Paid Apps Agreement/bank/tax, builds, screenshot.
+
+Blocked / not done:
+- **App version 1.0 page: Save was rejected** (required App Review contact fields First name, Last name,
+  Email, Phone are empty). Description + app review note edits are staged in the open tab, unsaved; exact
+  edits in docs/ASC_VERSION_EDITS.md. You must fill the contact fields (personal data) and Save.
+  The live description still says "Every mode, effect, and output is free ... saves your recordings
+  directly to Photos" and "instant sharing": inaccurate under the new model until saved.
+- **IAP review screenshot**: no suitable image exists locally (docs/screenshots has none of the Unlock
+  sheet). Capture the Unlock sheet (Debug build, left drawer > Record & Stream > Debug > Preview free
+  tier, record, My Clips, clip menu > Share) on a 6.9"/6.5" iPhone and upload it on the IAP page.
+- **Attach IAP to the version**: the version page shows no "In-App Purchases" section yet (appears once
+  the IAP is Ready to Submit, i.e. after the screenshot). Needs a new build above 18 too (I may not upload builds).
+- Paid Apps Agreement (Pending User Info), bank account, tax forms: yours to complete.
