@@ -283,6 +283,11 @@ final class AppModel: ObservableObject {
         #endif
     }
 
+    /// True while exporting is locked (free tier). Drives the gallery hint.
+    var exportLocked: Bool { !entitled(.exportOutput) }
+    /// Once-per-session gallery hint dismissal (not persisted).
+    @Published var galleryHintDismissed = false
+
     /// True when a recording/snapshot started now must be watermarked.
     func watermarkRequired() -> Bool { !entitled(.removeWatermark) }
 

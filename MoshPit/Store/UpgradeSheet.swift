@@ -2,9 +2,9 @@ import SwiftUI
 
 /// The one upgrade surface. Presented through AppModel.presentUpgrade(for:)
 /// so it respects the overlay mutual-exclusivity system. No dark patterns:
-/// no timers, no fake urgency, no nagging — what's gated (only saving
-/// recordings to Photos), one price button with the localized price, Restore,
-/// and a plain Not Now.
+/// no timers, no fake urgency, no nagging — what the unlock does (removes the
+/// watermark on new recordings/snapshots, enables exporting), one price button
+/// with the localized price, Restore, and a plain Not Now.
 ///
 /// v1 ships with NO redeem-code entry anywhere in the UI (App Store
 /// Guideline 3.1.1: license-key-style unlocks outside IAP are a rejection
@@ -23,19 +23,23 @@ struct UpgradeSheet: View {
 
     var body: some View {
         VStack(spacing: Theme.g3) {
-            Text("Save to Photos")
+            Text("Remove the watermark and export your work")
                 .font(.title2.bold())
                 .foregroundStyle(Theme.textPrimary)
+                .multilineTextAlignment(.center)
                 .padding(.top, Theme.g4)
+                .padding(.horizontal, Theme.g3)
+
+            beforeAfter
 
             VStack(alignment: .leading, spacing: Theme.g2) {
-                benefitRow(icon: "square.and.arrow.down",
-                           text: "Save your recordings straight to your Photos library")
-                benefitRow(icon: "sparkles.tv",
-                           text: "Full quality, direct from the canvas — no on-screen UI in the way")
+                benefitRow(icon: "drop.degreesign.slash",
+                           text: "New recordings and snapshots come out clean, with no watermark")
+                benefitRow(icon: "square.and.arrow.up",
+                           text: "Share, save to Files or Photos, and export for social")
                 benefitRow(icon: "checkmark.seal",
-                           text: "One-time purchase. Unlocks forever, on all your devices")
-                Text("Everything else is free: every mode and effect, the session gallery, snapshots, and sharing — including Save to Files. This purchase only unlocks saving videos directly to Photos.")
+                           text: "One-time purchase — no subscription. Restore it any time")
+                Text("Free forever: every mode and effect, recording, the session gallery, and live NDI / MJPEG output. Free recordings carry a small watermark and stay in the app until you unlock.")
                     .font(Theme.labelSmall)
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.top, Theme.g1)
@@ -86,6 +90,40 @@ struct UpgradeSheet: View {
         .onChange(of: pro.isPro) { _, isPro in
             if isPro { dismiss() }   // AppModel completes the pending action
         }
+    }
+
+    /// Schematic before/after built from Theme tokens (no assets): the same
+    /// frame with and without the corner wordmark.
+    private var beforeAfter: some View {
+        HStack(spacing: Theme.g2) {
+            sample(title: "Free", marked: true)
+            sample(title: "Unlocked", marked: false)
+        }
+        .padding(.horizontal, Theme.g3)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Free recordings carry a small MoshPit watermark in the corner. Unlocked recordings are clean.")
+    }
+
+    private func sample(title: String, marked: Bool) -> some View {
+        VStack(spacing: Theme.gHalf) {
+            ZStack(alignment: .bottomTrailing) {
+                LinearGradient(colors: [Theme.accent.opacity(0.7), Theme.stroke],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                if marked {
+                    Text("MoshPit")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                        .padding(Theme.g1)
+                }
+            }
+            .frame(height: Theme.buttonLarge + Theme.g4)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+            Text(title)
+                .font(Theme.labelSmall)
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder

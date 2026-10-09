@@ -17,6 +17,22 @@ struct GalleryPanel: View {
 
     var body: some View {
         List {
+            if app.exportLocked, !app.galleryHintDismissed {
+                Section {
+                    HStack(alignment: .top, spacing: Theme.g1) {
+                        Text("Clips here have a watermark and can't be exported until you unlock. Viewing, playing, remixing and deleting stay free.")
+                            .font(Theme.labelSmall)
+                            .foregroundStyle(Theme.textSecondary)
+                        Spacer(minLength: 0)
+                        Button { app.galleryHintDismissed = true } label: {
+                            Image(systemName: "xmark").font(Theme.labelSmall)
+                                .frame(width: Theme.buttonStandard, height: Theme.buttonStandard)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Dismiss hint")
+                    }
+                }
+            }
             if app.sessionClips.isEmpty {
                 Section {
                     Text("Recordings from this session appear here.")
