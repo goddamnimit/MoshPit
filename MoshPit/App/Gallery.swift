@@ -135,6 +135,7 @@ private struct ClipRow: View {
                     .frame(width: Theme.buttonSmall, height: Theme.buttonSmall)
                     .contentShape(Rectangle())
             }
+            .accessibilityLabel("More actions")
         }
     }
 }
@@ -194,7 +195,7 @@ struct ClipPlaybackView: View {
             VStack {
                 HStack {
                     Spacer()
-                    IconButton(systemName: "xmark") { dismiss() }
+                    IconButton(systemName: "xmark") { dismiss() }.accessibilityLabel("Close")
                         .accessibilityLabel("Close")
                 }
                 .padding(.horizontal, Theme.g2)

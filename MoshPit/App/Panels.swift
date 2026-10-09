@@ -445,7 +445,7 @@ struct ControlPanel: View {
                         Spacer()
                         Button { app.midi.removeMapping(m) } label: {
                             Image(systemName: "trash")
-                        }.tint(Theme.accent)
+                        }.tint(Theme.accent).accessibilityLabel("Remove MIDI mapping")
                     }
                 }
             }
@@ -526,7 +526,7 @@ struct ControlPanel: View {
                         Text(String(format: "%+.2f", route.amount)).font(Theme.monoSmall).monospacedDigit()
                         Button {
                             app.modMatrix.routes.removeAll { $0.id == route.id }
-                        } label: { Image(systemName: "trash") }.tint(Theme.accent)
+                        } label: { Image(systemName: "trash") }.tint(Theme.accent).accessibilityLabel("Remove route")
                     }
                 }
                 Picker("Source", selection: $newSource) {
@@ -580,12 +580,13 @@ struct AutomationPanel: View {
                         }
                         Spacer()
                         Button("▶") { app.automation.play(s) }
+                            .accessibilityLabel("Play \(s.name)")
                         Button { renaming = s; newName = s.name } label: {
                             Image(systemName: "pencil")
-                        }
+                        }.accessibilityLabel("Rename \(s.name)")
                         Button { app.automation.delete(s) } label: {
                             Image(systemName: "trash")
-                        }.tint(Theme.accent)
+                        }.tint(Theme.accent).accessibilityLabel("Delete \(s.name)")
                     }
                     .buttonStyle(.borderless)
                 }

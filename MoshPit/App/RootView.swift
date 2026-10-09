@@ -1,6 +1,7 @@
 import SwiftUI
 import MetalKit
 import os
+import Combine
 
 // MARK: - Root: fullscreen canvas + edge drawers
 
@@ -602,6 +603,7 @@ private struct TopStrip: View {
                        selected: app.showCheatSheet) {
                 app.showCheatSheet.toggle()
             }
+            .accessibilityLabel("Help")
         }
     }
 }
@@ -708,6 +710,7 @@ private struct MainControlRow: View {
                     .frame(width: Theme.buttonStandard - Theme.g2)
             }
             .buttonStyle(MoshButtonStyle(size: .standard))
+            .accessibilityLabel("Bloom")
             .coachAnchor(.bloomButton)
 
             // Camera-app style snapshot: saves the post-effect, post-mirror
