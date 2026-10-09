@@ -35,7 +35,7 @@ struct UpgradeSheet: View {
                            text: "Full quality, direct from the canvas — no on-screen UI in the way")
                 benefitRow(icon: "checkmark.seal",
                            text: "One-time purchase. Unlocks forever, on all your devices")
-                Text("Everything else in MoshPit is free — every mode, effect, output, the session gallery, sharing, and snapshots stay unlocked.")
+                Text("Everything else is free: every mode and effect, the session gallery, snapshots, and sharing — including Save to Files. This purchase only unlocks saving videos directly to Photos.")
                     .font(Theme.labelSmall)
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.top, Theme.g1)
@@ -55,7 +55,7 @@ struct UpgradeSheet: View {
                             ProgressView().tint(Theme.textPrimary)
                         } else {
                             // Localized price from StoreKit — never hardcoded.
-                            Text("Unlock — \(pro.product?.displayPrice ?? "…")")
+                            Text(pro.product.map { "Unlock — \($0.displayPrice)" } ?? "Unlock")
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -82,6 +82,7 @@ struct UpgradeSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.scrimBase)
         .preferredColorScheme(.dark)
+        .task { await pro.loadProduct() }
         .onChange(of: pro.isPro) { _, isPro in
             if isPro { dismiss() }   // AppModel completes the pending action
         }

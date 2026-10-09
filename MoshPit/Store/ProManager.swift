@@ -167,17 +167,25 @@ final class ProManager: ObservableObject {
         return true
     }
 
-    func loadProduct() async {
-        guard product == nil else { return }
-        product = try? await Product.products(for: [Self.productID]).first
+    /// Loads the product for display. Returns whether it is available; on
+    /// failure the sheet shows a retryable message instead of a dead button.
+    @discardableResult
+    func loadProduct() async -> Bool {
+        if product != nil { return true }
+        do {
+            product = try await Product.products(for: [Self.productID]).first
+        } catch {
+            product = nil
+        }
+        return product != nil
     }
 
     // MARK: Purchase
 
     func purchase() async {
-        if product == nil { await loadProduct() }
-        guard let product else {
-            purchaseState = .failed("Can't reach the App Store right now. Please try again.")
+        purchaseState = .purchasing
+        guard await loadProduct(), let product else {
+            purchaseState = .failed("Can't reach the App Store right now. Check your connection and tap Unlock to try again.")
             return
         }
         purchaseState = .purchasing
@@ -204,7 +212,14 @@ final class ProManager: ObservableObject {
 
     func restore() async {
         purchaseState = .restoring
-        try? await AppStore.sync()
+        do {
+            try await AppStore.sync()
+        } catch {
+            // Sign-in cancelled or App Store unreachable: say so rather than
+            // claiming there is no purchase.
+            purchaseState = .failed("Couldn't reach the App Store to restore. Please try again.")
+            return
+        }
         await refreshEntitlement()
         purchaseState = storeEntitled ? .idle : .info("No previous purchase found.")
     }
