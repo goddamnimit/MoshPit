@@ -153,7 +153,8 @@ private struct ClipRow: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Theme.textSecondary)
                     .frame(width: Theme.buttonSmall, height: Theme.buttonSmall)
-                    .contentShape(Rectangle())
+                    // 44pt hit area, 32pt visual.
+                    .contentShape(Rectangle().inset(by: -(Theme.tapTarget - Theme.buttonSmall) / 2))
             }
             .accessibilityLabel("More actions")
         }

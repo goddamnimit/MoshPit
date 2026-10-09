@@ -170,7 +170,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in app.scenePhaseChanged(phase) }
         .onChange(of: app.openDrawer) { _, side in
             lastDrawerInteraction = Date()
-            withAnimation(.spring(duration: 0.3)) {
+            withAnimation(Theme.spring) {
                 leftProgress = side == .left ? 1 : 0
                 rightProgress = side == .right ? 1 : 0
             }
@@ -300,7 +300,7 @@ struct RootView: View {
         wake()
         if app.openDrawer == side {
             // Same target (or already nil): still settle any partial drag.
-            withAnimation(.spring(duration: 0.3)) {
+            withAnimation(Theme.spring) {
                 leftProgress = side == .left ? 1 : 0
                 rightProgress = side == .right ? 1 : 0
             }
@@ -843,7 +843,7 @@ struct PressScaleStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? Theme.pressedScale : 1)
             .brightness(configuration.isPressed ? -0.08 : 0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(Theme.press, value: configuration.isPressed)
     }
 }
 
@@ -1033,7 +1033,7 @@ struct XYPad: View {
                 .onEnded { _ in
                     if params.mode == .drift || params.mode == .classicSmear {
                         // Spring back: drift is a momentary push.
-                        withAnimation(.easeOut(duration: 0.15)) { knob = .init(x: 0.5, y: 0.5) }
+                        withAnimation(Theme.settle) { knob = .init(x: 0.5, y: 0.5) }
                         params.set(.driftX, 0, origin: .ui)
                         params.set(.driftY, 0, origin: .ui)
                     }

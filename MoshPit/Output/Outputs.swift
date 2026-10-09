@@ -29,7 +29,7 @@ final class MoshRecorder: NSObject, ObservableObject,
                     if !granted {
                         DispatchQueue.main.async {
                             self.recordMic = false
-                            self.lastError = "Microphone access denied"
+                            self.lastError = "Microphone access is off. Turn it on in Settings to record sound."
                         }
                     }
                 }

@@ -77,6 +77,10 @@ struct SourcesPanel: View {
                             }())
                         }
                     }
+                    if case .error(let message)? = app.sources?.statuses[slot],
+                       message.contains("Camera access") {
+                        Button("Open Settings") { AppModel.openAppSettings() }
+                    }
                     if app.sources?.isReversible(slot: slot) == true {
                         Toggle("Reverse playback", isOn: Binding(
                             get: { app.sources?.reversed[slot] ?? false },
@@ -665,6 +669,9 @@ struct OutputPanel: View {
                         get: { rec.recordMic }, set: { rec.recordMic = $0 }))
                     if let err = rec.lastError {
                         Text(err).font(Theme.labelSmall).foregroundStyle(Theme.accent)
+                        if err.contains("access") {
+                            Button("Open Settings") { AppModel.openAppSettings() }
+                        }
                     }
                 }
             }

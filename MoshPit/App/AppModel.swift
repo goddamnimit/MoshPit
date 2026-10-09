@@ -260,8 +260,36 @@ final class AppModel: ObservableObject {
                 .store(in: &cancellables)
         }
 
+        // Recording robustness: backgrounding or an audio interruption (phone
+        // call, Siri, alarm) stops the recording so the writer finalizes a
+        // playable file instead of leaving a truncated one. The clip then
+        // follows the normal stop path (gallery + toast).
+        let nc = NotificationCenter.default
+        nc.publisher(for: UIApplication.willResignActiveNotification)
+            .merge(with: nc.publisher(for: UIApplication.didEnterBackgroundNotification))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.stopRecordingForInterruption() }
+            .store(in: &cancellables)
+        nc.publisher(for: AVAudioSession.interruptionNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+                if raw == AVAudioSession.InterruptionType.began.rawValue {
+                    self?.stopRecordingForInterruption()
+                }
+            }
+            .store(in: &cancellables)
+
         // AppModel is always created on main (@StateObject / tests on main).
         MainActor.assumeIsolated { bindProManager() }
+    }
+
+    /// Finalizes an in-progress recording when the app loses the foreground or
+    /// the audio session is interrupted. No-op when idle.
+    func stopRecordingForInterruption() {
+        guard let recorder, recorder.isRecording else { return }
+        recorder.stop()
+        showToast("Recording stopped — the app was interrupted")
     }
 
     // MARK: Pro gate (save-to-Photos only)
@@ -496,7 +524,7 @@ final class AppModel: ObservableObject {
     func snapshot() {
         guard let renderer else { return }
         Theme.haptic()
-        withAnimation(.easeIn(duration: 0.05)) { snapshotFlash = true }
+        withAnimation(Theme.flash) { snapshotFlash = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(Theme.fade) { self.snapshotFlash = false }
         }
@@ -527,6 +555,13 @@ final class AppModel: ObservableObject {
                                          shareURL: wrote ? pngURL : nil)
                 }
             }
+        }
+    }
+
+    /// Deep link to this app's page in Settings (permission recovery).
+    static func openAppSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
         }
     }
 

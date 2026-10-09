@@ -149,13 +149,13 @@ struct CoachOverlay: View {
                         SpotlightShape(cutout: target)
                             .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
                             .ignoresSafeArea()
-                            .animation(.spring(duration: 0.45), value: target)
+                            .animation(Theme.springSlow, value: target)
                             .allowsHitTesting(false)
                         RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
                             .stroke(Theme.accent, lineWidth: 2)
                             .frame(width: target.width, height: target.height)
                             .position(x: target.midX, y: target.midY)
-                            .animation(.spring(duration: 0.45), value: target)
+                            .animation(Theme.springSlow, value: target)
                             .allowsHitTesting(false)
                         callout(for: stop, target: target, in: geo)
                             .onChange(of: target) { _, newTarget in
@@ -251,7 +251,7 @@ struct CoachOverlay: View {
             x: min(max(target.midX, 156), geo.size.width - 156),
             y: below ? min(target.maxY + 80, geo.size.height - 120)
                      : max(target.minY - 80, 120))
-        .animation(.spring(duration: 0.45), value: target)
+        .animation(Theme.springSlow, value: target)
     }
 
     private var finaleCard: some View {

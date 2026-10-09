@@ -337,7 +337,7 @@ final class CameraSource: NSObject, FrameSource, AVCaptureVideoDataOutputSampleB
                     }
                 }
             } else {
-                self.onStatus?(.error("Camera access denied"))
+                self.onStatus?(.error("Camera access is off. Turn it on in Settings to use the camera."))
             }
         }
     }

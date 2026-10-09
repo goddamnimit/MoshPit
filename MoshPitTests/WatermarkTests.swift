@@ -176,3 +176,25 @@ final class WatermarkTests: XCTestCase {
                       && callRange.lowerBound < mjpegRange.lowerBound)
     }
 }
+
+@MainActor
+final class RecordingInterruptionTests: XCTestCase {
+    func testBackgroundingFinalizesAnActiveRecording() throws {
+        let app = AppModel()
+        try XCTSkipIf(app.recorder == nil, "Metal unavailable")
+        app.recorder?.start(width: 64, height: 64)
+        XCTAssertEqual(app.recorder?.isRecording, true)
+        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification,
+                                        object: nil)
+        let stopped = expectation(description: "stopped")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { stopped.fulfill() }
+        wait(for: [stopped], timeout: 2)
+        XCTAssertEqual(app.recorder?.isRecording, false)
+    }
+
+    func testInterruptionWhileIdleIsANoOp() {
+        let app = AppModel()
+        app.stopRecordingForInterruption()
+        XCTAssertNotEqual(app.recorder?.isRecording, true)
+    }
+}

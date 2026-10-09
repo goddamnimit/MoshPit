@@ -44,7 +44,30 @@ enum Theme {
 
     // MARK: Motion & feedback
     static let pressedScale: CGFloat = 0.97
-    static let fade = Animation.easeInOut(duration: 0.25)
+    /// All curves live here and honor Reduce Motion: movement/scale curves
+    /// collapse to a near-instant change (opacity-only feel) when it is on.
+    private static var reduceMotion: Bool { UIAccessibility.isReduceMotionEnabled }
+    static var fade: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.25)
+    }
+    /// Drawer / sheet / tab transitions.
+    static var spring: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .spring(duration: 0.3)
+    }
+    /// Coach-mark spotlight travel.
+    static var springSlow: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .spring(duration: 0.45)
+    }
+    /// Button press feedback.
+    static var press: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .easeOut(duration: 0.12)
+    }
+    static var flash: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .easeIn(duration: 0.05)
+    }
+    static var settle: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .easeOut(duration: 0.15)
+    }
     /// Overlay controls fade after this many seconds without interaction.
     static let idleTimeout: TimeInterval = 4
 
@@ -128,7 +151,7 @@ struct MoshButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? Theme.pressedScale : 1)
             .brightness(configuration.isPressed ? -0.08 : 0)
             .contentShape(Rectangle().inset(by: -max(0, (Theme.tapTarget - height) / 2)))
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(Theme.press, value: configuration.isPressed)
     }
 }
 
