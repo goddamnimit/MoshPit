@@ -28,7 +28,7 @@ HOW TO TEST WITHOUT ANY SPECIAL HARDWARE
    app's single in-app purchase (see below). The photo-library-add
    permission is used when an unlocked user saves a recording or snapshot.
 4. Network output does NOT require NDI hardware or NDI software. In the
-   Output panel, enable "MJPEG Server", then open
+   Record & Stream panel, enable "Serve MJPEG Stream", then open
    `http://<device-ip>:8080/stream` in any web browser on a computer on the
    same Wi-Fi network. You will see the app's live output in the browser.
    This is the easiest way to verify the local-network feature.
@@ -47,7 +47,7 @@ WHY EACH PERMISSION IS REQUESTED
 - Local network + Bonjour (`_ndi._tcp.`): the app can act as a video output
   for VJ software (Resolume, OBS, VDMX) over NDI, and serves the MJPEG
   stream described above. The local-network prompt appears only when the
-  user enables a network output in the Output panel. Nothing is sent unless
+  user enables a network output in the Record & Stream panel. Nothing is sent unless
   the user turns an output on; there is no internet/analytics traffic.
 
 IN-APP PURCHASE
@@ -57,7 +57,8 @@ non-consumable that removes the watermark from new recordings and
 snapshots and unlocks exporting (Share sheet, Save to Files/Photos, Share to
 Social). Everything else — all modes, effects, sources, NDI/MJPEG output,
 recording, the session gallery (view/play/remix/delete) — is free. To test:
-record a clip, open the Gallery from the left drawer and see the watermark;
+record a clip, open My Clips from the left drawer and see the watermark (the shutter button adds a
+watermarked snapshot there too);
 tap the clip's menu > Share (or the Share button on the post-recording
 toast) to see the unlock sheet; a sandbox purchase (or Restore Purchases on
 the same sheet) completes the share. New recordings after unlocking have

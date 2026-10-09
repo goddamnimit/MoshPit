@@ -8,25 +8,28 @@
 
 ## IAP review screenshot
 Capture the **Unlock sheet** ("Remove the watermark and export your work", price button,
-Restore Purchases). Easiest: run a Debug build, Output panel > Debug > "Preview free tier",
-record, open Gallery, clip menu > Share. Use a 6.9" or 6.5" iPhone, no status-bar clutter.
+Restore Purchases). Easiest: run a Debug build, left drawer > Record & Stream > Debug >
+"Preview free tier", record, open My Clips, clip menu > Share. Use a 6.9" or 6.5" iPhone, no status-bar clutter.
 Must be a real screenshot of the app.
 
 ## App Review note (paste into the version's Review Notes and the IAP's Review Notes)
 MoshPit has one in-app purchase, "MoshPit Pro". Free users get every mode and effect plus
 recording; recordings carry a small "MoshPit" watermark and stay in the app. The purchase
 removes the watermark on NEW recordings/snapshots and unlocks exporting.
-To test: (1) tap the red record button, wave at the camera, tap again. (2) Open the left
-drawer > Gallery and play the clip: a small watermark is visible bottom-right. (3) Tap the
-clip's "..." menu > Share (or Share to Social), or Share on the toast: the unlock sheet
-appears. (4) Buy with a sandbox account (or Restore Purchases on the sheet); the share
-sheet opens. (5) Record again: the new clip has no watermark. Viewing, playing, remixing and
-deleting clips, and NDI/MJPEG output, are always free. No account, ads, or analytics.
+To test: (1) tap the red record button, wave at the camera, tap again. (2) Swipe in from the
+left edge, tap "My Clips" and play the clip: a small watermark is visible bottom-right. The
+camera (shutter) button also adds a watermarked snapshot to My Clips. (3) Tap the clip's "..."
+menu > Share (or Share to Social), or Share on the toast: the unlock sheet appears. (4) Buy with
+a sandbox account (or Restore Purchases on the sheet); the share sheet opens. (5) Record again:
+the new clip has no watermark. Viewing, playing, reusing as an input and deleting clips, and
+NDI/MJPEG output, are always free. First launch shows a short welcome and "?" buttons explain
+each control. No account, ads, or analytics.
 The strobe flicker limiter (3 Hz) is on by default.
 
 ## Revised description section (free vs unlocked)
-FREE: every mode, effect and source; recording; the in-app session gallery; live NDI and MJPEG
-output. Free recordings carry a small MoshPit watermark and stay in the app.
+FREE: every glitch style, effect and input; recording and snapshots; the in-app My Clips gallery;
+live NDI and MJPEG output. Free recordings and snapshots carry a small MoshPit watermark and stay
+in the app. Friendly names and "?" hints explain every control in plain language.
 UNLOCK (one-time purchase, no subscription): remove the watermark from new recordings and
 snapshots, and export: Share, Save to Files or Photos, and social-ready 9:16 export.
 
@@ -48,5 +51,7 @@ snapshots, and export: Share, Save to Files or Photos, and social-ready 9:16 exp
 - [ ] IAP: upload review screenshot, confirm metadata above, Cleared for Sale.
 - [ ] Build number must be above 18 (e.g. 19); archive and upload.
 - [ ] On the new version page attach the IAP under "In-App Purchases"; paste review notes.
-- [ ] Update the app description, screenshots/notes that mention free Photos saving.
+- [ ] Update the app description, screenshots/notes that mention free Photos saving, and any screenshots
+      showing old labels (modes are now Smear / Burst / Pulse Burst / Push / Blend / Swap Motion / Tunnel;
+      panels are Inputs / Effects / 3D View / Rhythm & Links / Record Moves / Record & Stream / My Clips).
 - [ ] Resubmit.

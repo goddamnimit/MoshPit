@@ -184,7 +184,7 @@ an XY pad. The circular arrow resets to a clean frame.
 in-app session gallery with a small watermark. Exporting (Share, Save to
 Files/Photos, Share to Social) and watermark-free recordings/snapshots are
 the single in-app purchase (below).
-4. Network output needs NO NDI hardware/software: in the Output panel
+4. Network output needs NO NDI hardware/software: in the Record & Stream panel
 enable "MJPEG Server", then open http://<device-ip>:8080/stream in any
 browser on the same Wi-Fi to see the live output.
 
