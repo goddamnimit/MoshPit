@@ -22,7 +22,10 @@ struct PanelSheet: View {
                 case .gallery: GalleryPanel(exporter: app.socialExporter)
                 }
             }
-            .navigationTitle(panel.rawValue)
+            .navigationTitle(Labels.panel(panel).title)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { HintButton(key: .panel(panel)) }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -101,7 +104,7 @@ struct SourcesPanel: View {
                     }
                 }
             }
-            Section("Network stream (HLS)") {
+            HintSection(key: .group(.hls)) {
                 TextField("https://…/stream.m3u8", text: $urlText)
                     .keyboardType(.URL).autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
@@ -134,23 +137,23 @@ struct SourcesPanel: View {
                 Text("DRM/FairPlay streams won't yield pixel buffers and can't be moshed.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
-            Section("Mix — A/B wipes (feeds the mosh engine)") {
-                ParamRow(id: .mixCrossfade, label: "A <-> B")
-                ParamRow(id: .wipeMode, label: "Wipe", steps: ["XFADE", "LUMA", "MASK"])
-                ParamRow(id: .wipeSoftness, label: "Soft")
-                Toggle("Luma wipe reads MOD (else B)", isOn: boolBinding(.wipeLumaFromMod))
-                Text("Route an LFO to the crossfader in Control for rhythmic source switching.")
+            HintSection(key: .group(.mixer)) {
+                ParamRow(id: .mixCrossfade)
+                ParamRow(id: .wipeMode, steps: ["XFADE", "LUMA", "MASK"])
+                ParamRow(id: .wipeSoftness)
+                ParamToggle(id: .wipeLumaFromMod)
+                Text("Link a rhythm wave to A ↔ B in Rhythm & Links for beat-synced cuts.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
-            Section("Processing") {
-                PanelSlider(id: .processingRes, label: "Canvas res",
+            HintSection(key: .group(.processing)) {
+                PanelSlider(id: .processingRes,
                             steps: kResolutions.map { "\($0)p" })
-                PanelSlider(id: .blockSize, label: "Block size",
+                PanelSlider(id: .blockSize,
                             steps: kBlockSizes.map { "\($0)px" })
-                Toggle("Smooth vectors (bilinear)", isOn: boolBinding(.smoothVectors))
-                Toggle("Vision optical flow (vs block match)", isOn: boolBinding(.estimatorBackend))
-                Toggle("Cross-mosh (A motion → B pixels)", isOn: boolBinding(.crossMosh))
-                PanelSlider(id: .heal, label: "Heal leak")
+                ParamToggle(id: .smoothVectors)
+                ParamToggle(id: .estimatorBackend)
+                ParamToggle(id: .crossMosh)
+                PanelSlider(id: .heal)
             }
         }
         .sheet(item: $pickingFor) { slot in
@@ -268,12 +271,10 @@ struct EffectsPanel: View {
 
     var body: some View {
         List {
-            Section("Chain (drag to reorder)") {
+            HintSection(key: .group(.effectsChain)) {
                 ForEach(app.effectOrder) { fx in
                     VStack(alignment: .leading, spacing: Theme.g1) {
-                        Toggle(fx.title, isOn: Binding(
-                            get: { app.params.bool(fx.enableParam) },
-                            set: { app.params.set(fx.enableParam, $0 ? 1 : 0, origin: .ui) }))
+                        ParamToggle(id: fx.enableParam)
                         if app.params.bool(fx.enableParam) { effectParams(fx) }
                     }
                 }
@@ -294,7 +295,7 @@ struct EffectsPanel: View {
 
     /// Post-chain mirror (finisher pass): preview and recordings both get it.
     @ViewBuilder private var mirrorSection: some View {
-        Section("Mirror (after chain — recorded too)") {
+        HintSection(key: .param(.mirrorMode)) {
             Picker("Mirror", selection: Binding(
                 get: { Int(app.params.get(.mirrorMode)) },
                 set: { app.params.set(.mirrorMode, Float($0), origin: .ui) })) {
@@ -304,15 +305,13 @@ struct EffectsPanel: View {
             }
             .pickerStyle(.segmented)
             if Int(app.params.get(.mirrorMode)) == MirrorMode.horizontal.rawValue {
-                Toggle("Mirror right half (instead of left)", isOn: Binding(
-                    get: { app.params.bool(.mirrorRightToLeft) },
-                    set: { app.params.set(.mirrorRightToLeft, $0 ? 1 : 0, origin: .ui) }))
+                ParamToggle(id: .mirrorRightToLeft)
             }
         }
     }
 
     @ViewBuilder private var colorSection: some View {
-        Section("Color mode") {
+        HintSection(key: .param(.colorMode)) {
             Picker("Color", selection: Binding(
                 get: { Int(app.params.get(.colorMode)) },
                 set: { app.params.set(.colorMode, Float($0), origin: .ui) })) {
@@ -323,11 +322,11 @@ struct EffectsPanel: View {
             .pickerStyle(.segmented)
             switch ColorMode(rawValue: Int(app.params.get(.colorMode))) {
             case .duotone:
-                ParamRow(id: .duotoneShadowHue, label: "Shadow°")
-                ParamRow(id: .duotoneHighlightHue, label: "Light°")
+                ParamRow(id: .duotoneShadowHue)
+                ParamRow(id: .duotoneHighlightHue)
             case .hueShift:
-                ParamRow(id: .colorHueShift, label: "Hue°")
-                Text("Route an LFO to colorHueShift in Control for a color cycle.")
+                ParamRow(id: .colorHueShift)
+                Text("Link a rhythm wave to Color spin in Rhythm & Links for a color cycle.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             default:
                 EmptyView()
@@ -337,17 +336,15 @@ struct EffectsPanel: View {
 
     /// Post-chain grid-mesh warp (finisher pass): recorded/NDI/MJPEG too.
     @ViewBuilder private var gridWarpSection: some View {
-        Section("Grid-Mesh Glitch Warp (after chain — recorded too)") {
-            Toggle("Grid-Mesh Glitch Warp", isOn: Binding(
-                get: { app.params.bool(.gridWarpEnabled) },
-                set: { app.params.set(.gridWarpEnabled, $0 ? 1 : 0, origin: .ui) }))
+        HintSection(key: .param(.gridWarpEnabled)) {
+            ParamToggle(id: .gridWarpEnabled)
                 .coachAnchorGlobal(.gridWarpToggle)
             if app.params.bool(.gridWarpEnabled) {
-                ParamRow(id: .gridWarpCellSize, label: "Cells")
-                ParamRow(id: .gridWarpIntensity, label: "Warp")
-                ParamRow(id: .gridWarpLineOpacity, label: "Mesh")
-                ParamRow(id: .gridWarpAnimSpeed, label: "Speed")
-                Text("Route an LFO to gridWarpAnimSpeed in Control for a pulsing warp.")
+                ParamRow(id: .gridWarpCellSize)
+                ParamRow(id: .gridWarpIntensity)
+                ParamRow(id: .gridWarpLineOpacity)
+                ParamRow(id: .gridWarpAnimSpeed)
+                Text("Link a rhythm wave to Drift speed in Rhythm & Links for a pulsing warp.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
         }
@@ -355,19 +352,17 @@ struct EffectsPanel: View {
 
     /// Post-chain spreadsheet mosaic (finisher pass): recorded/NDI/MJPEG too.
     @ViewBuilder private var spreadsheetSection: some View {
-        Section("Spreadsheet Mosh Filter (after chain — recorded too)") {
-            Toggle("Spreadsheet Mosh Filter", isOn: Binding(
-                get: { app.params.bool(.spreadsheetEnabled) },
-                set: { app.params.set(.spreadsheetEnabled, $0 ? 1 : 0, origin: .ui) }))
+        HintSection(key: .param(.spreadsheetEnabled)) {
+            ParamToggle(id: .spreadsheetEnabled)
                 .coachAnchorGlobal(.spreadsheetToggle)
             if app.params.bool(.spreadsheetEnabled) {
-                ParamRow(id: .spreadsheetCellSize, label: "Cols")
-                ParamRow(id: .spreadsheetChromeOpacity, label: "Chrome")
-                ParamRow(id: .spreadsheetGridLineOpacity, label: "Lines")
-                ParamRow(id: .spreadsheetSelectionSpeed, label: "Cursor")
-                ParamRow(id: .spreadsheetCellRevealMode, label: "Reveal",
+                ParamRow(id: .spreadsheetCellSize)
+                ParamRow(id: .spreadsheetChromeOpacity)
+                ParamRow(id: .spreadsheetGridLineOpacity)
+                ParamRow(id: .spreadsheetSelectionSpeed)
+                ParamRow(id: .spreadsheetCellRevealMode,
                          steps: ["OFF", "WIPE", "RAND"])
-                Text("Route an LFO to spreadsheetSelectionSpeed in Control to sync the cursor.")
+                Text("Link a rhythm wave to Cursor speed in Rhythm & Links to sync the cursor.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
         }
@@ -375,17 +370,15 @@ struct EffectsPanel: View {
 
     /// Post-chain tracking HUD (finisher pass): recorded/NDI/MJPEG too.
     @ViewBuilder private var trackingHUDSection: some View {
-        Section("Tracking HUD Overlay (after chain — recorded too)") {
-            Toggle("Tracking HUD Overlay", isOn: Binding(
-                get: { app.params.bool(.trackingHUDEnabled) },
-                set: { app.params.set(.trackingHUDEnabled, $0 ? 1 : 0, origin: .ui) }))
+        HintSection(key: .param(.trackingHUDEnabled)) {
+            ParamToggle(id: .trackingHUDEnabled)
                 .coachAnchorGlobal(.trackingHUDToggle)
             if app.params.bool(.trackingHUDEnabled) {
-                ParamRow(id: .trackingHUDPointDensity, label: "Points")
-                ParamRow(id: .trackingHUDLabelDensity, label: "Labels")
-                ParamRow(id: .trackingHUDLineOpacity, label: "Mesh")
-                ParamRow(id: .trackingHUDColor, label: "Hue°")
-                Text("Points follow real Vision optical flow; route an LFO to trackingHUDColor for a color sweep.")
+                ParamRow(id: .trackingHUDPointDensity)
+                ParamRow(id: .trackingHUDLabelDensity)
+                ParamRow(id: .trackingHUDLineOpacity)
+                ParamRow(id: .trackingHUDColor)
+                Text("Dots follow real movement in the picture. Link a rhythm wave to Tracker color for a color sweep.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
         }
@@ -395,29 +388,25 @@ struct EffectsPanel: View {
     private func effectParams(_ fx: EffectID) -> some View {
         switch fx {
         case .echo:
-            PanelSlider(id: .echoLayers, label: "Layers")
-            PanelSlider(id: .echoKeyLow, label: "Key low")
-            PanelSlider(id: .echoKeyHigh, label: "Key high")
+            PanelSlider(id: .echoLayers)
+            PanelSlider(id: .echoKeyLow)
+            PanelSlider(id: .echoKeyHigh)
         case .slitscan:
-            PanelSlider(id: .slitscanSpeed, label: "Speed")
-            PanelSlider(id: .slitscanAngle, label: "Angle")
-            PanelSlider(id: .slitscanScrub, label: "Scrub")
-            Toggle("Gradient from source B", isOn: Binding(
-                get: { app.params.bool(.slitscanUseB) },
-                set: { app.params.set(.slitscanUseB, $0 ? 1 : 0, origin: .ui) }))
+            PanelSlider(id: .slitscanSpeed)
+            PanelSlider(id: .slitscanAngle)
+            PanelSlider(id: .slitscanScrub)
+            ParamToggle(id: .slitscanUseB)
         case .weaver:
-            PanelSlider(id: .weaverAmount, label: "Amount")
+            PanelSlider(id: .weaverAmount)
         case .pixelSort:
-            PanelSlider(id: .pixelSortThreshold, label: "Threshold")
-            Toggle("Vertical", isOn: Binding(
-                get: { app.params.bool(.pixelSortVertical) },
-                set: { app.params.set(.pixelSortVertical, $0 ? 1 : 0, origin: .ui) }))
+            PanelSlider(id: .pixelSortThreshold)
+            ParamToggle(id: .pixelSortVertical)
         case .procAmp:
-            PanelSlider(id: .brightness, label: "Bright")
-            PanelSlider(id: .contrast, label: "Contrast")
-            PanelSlider(id: .saturation, label: "Sat")
-            PanelSlider(id: .hueShift, label: "Hue")
-            PanelSlider(id: .gamma, label: "Gamma")
+            PanelSlider(id: .brightness)
+            PanelSlider(id: .contrast)
+            PanelSlider(id: .saturation)
+            PanelSlider(id: .hueShift)
+            PanelSlider(id: .gamma)
         }
     }
 }
@@ -434,10 +423,10 @@ struct ControlPanel: View {
     var body: some View {
         List {
             struktSection
-            Section("MIDI (long-press any slider label, then move a knob)") {
+            HintSection(key: .group(.midi)) {
                 LabeledContent("Last event", value: app.midi.lastEvent)
                 if let target = app.midi.learnTarget {
-                    Label("Learning → \(target.rawValue)… move a CC",
+                    Label("Learning \(Labels.param(target).title)… turn a MIDI knob",
                           systemImage: "dot.radiowaves.left.and.right")
                         .foregroundStyle(Theme.accent)
                     Button("Cancel learn") { app.midi.learnTarget = nil }
@@ -445,7 +434,7 @@ struct ControlPanel: View {
                 ForEach(app.midi.mappings) { m in
                     HStack {
                         Text("ch\(m.channel + 1) cc\(m.cc)").font(Theme.monoSmall).monospacedDigit()
-                        Text("→ \(m.parameter.rawValue)").font(Theme.label)
+                        Text("→ \(Labels.param(m.parameter).title)").font(Theme.label)
                         Spacer()
                         Button { app.midi.removeMapping(m) } label: {
                             Image(systemName: "trash")
@@ -466,32 +455,29 @@ struct ControlPanel: View {
     }
 
     @ViewBuilder private var struktSection: some View {
-        Section("Strukt — LFO bank") {
+        HintSection(key: .group(.strukt)) {
             HStack(spacing: Theme.g1) {
                 Button {
                     Theme.haptic()
                     app.tapTempo()
                 } label: { Text("TAP") }
                 .buttonStyle(MoshButtonStyle(size: .standard, selected: true))
-                ParamRow(id: .bpm, label: "BPM")
+                ParamRow(id: .bpm)
             }
             lfoRows(1)
             lfoRows(2)
-            ParamRow(id: .struktFlip, label: "Flip A/B", steps: ["OFF", "LFO1", "LFO2"])
-            ParamRow(id: .struktInvert, label: "Invert", steps: ["OFF", "LFO1", "LFO2"])
-            ParamRow(id: .struktFlash, label: "Flash", steps: ["OFF", "LFO1", "LFO2"])
-            Toggle("Whiteout flash (vs blackout)", isOn: panelBool(.struktFlashWhite))
-            Toggle("Flicker limiter (max 3 Hz strobe)", isOn: Binding(
-                get: { app.params.bool(.flickerLimit) },
-                set: { on in
-                    app.params.set(.flickerLimit, on ? 1 : 0, origin: .ui)
-                    // Photosensitivity warning, once, when the cap is raised.
-                    let warnedKey = "moshpit.flickerWarned"
-                    if !on, !UserDefaults.standard.bool(forKey: warnedKey) {
-                        UserDefaults.standard.set(true, forKey: warnedKey)
-                        showFlickerWarning = true
-                    }
-                }))
+            ParamRow(id: .struktFlip, steps: ["OFF", "LFO1", "LFO2"])
+            ParamRow(id: .struktInvert, steps: ["OFF", "LFO1", "LFO2"])
+            ParamRow(id: .struktFlash, steps: ["OFF", "LFO1", "LFO2"])
+            ParamToggle(id: .struktFlashWhite)
+            ParamToggle(id: .flickerLimit) { on in
+                // Photosensitivity warning, once, when the cap is raised.
+                let warnedKey = "moshpit.flickerWarned"
+                if !on, !UserDefaults.standard.bool(forKey: warnedKey) {
+                    UserDefaults.standard.set(true, forKey: warnedKey)
+                    showFlickerWarning = true
+                }
+            }
         }
     }
 
@@ -502,16 +488,16 @@ struct ControlPanel: View {
         let div: ParameterID = n == 1 ? .lfo1Div : .lfo2Div
         let phaseP: ParameterID = n == 1 ? .lfo1Phase : .lfo2Phase
         let depth: ParameterID = n == 1 ? .lfo1Depth : .lfo2Depth
-        DisclosureGroup("LFO \(n)") {
-            ParamRow(id: wave, label: "Wave", steps: LFOWave.names)
+        DisclosureGroup("Rhythm wave \(n)") {
+            ParamRow(id: wave, steps: LFOWave.names)
             if app.params.bool(sync) {
-                ParamRow(id: div, label: "Division", steps: kLFODivisions.map(\.0))
+                ParamRow(id: div, steps: kLFODivisions.map(\.0))
             } else {
-                ParamRow(id: rate, label: "Rate Hz")
+                ParamRow(id: rate)
             }
-            Toggle("Tempo sync", isOn: panelBool(sync))
-            ParamRow(id: phaseP, label: "Phase")
-            ParamRow(id: depth, label: "Depth")
+            ParamToggle(id: sync)
+            ParamRow(id: phaseP)
+            ParamRow(id: depth)
         }
     }
 
@@ -521,10 +507,10 @@ struct ControlPanel: View {
     }
 
     @ViewBuilder private var modMatrixSection: some View {
-            Section("Mod matrix (MOD input & LFOs drive parameters)") {
+            HintSection(key: .group(.modMatrix)) {
                 ForEach(app.modMatrix.routes) { route in
                     HStack {
-                        Text("\(route.source.rawValue) → \(route.destination.rawValue)")
+                        Text("\(Labels.modSource(route.source)) → \(Labels.param(route.destination).title)")
                             .font(Theme.label)
                         Spacer()
                         Text(String(format: "%+.2f", route.amount)).font(Theme.monoSmall).monospacedDigit()
@@ -534,10 +520,10 @@ struct ControlPanel: View {
                     }
                 }
                 Picker("Source", selection: $newSource) {
-                    ForEach(ModSource.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(ModSource.allCases) { Text(Labels.modSource($0)).tag($0) }
                 }
                 Picker("Destination", selection: $newDest) {
-                    ForEach(ParameterID.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    ForEach(ParameterID.allCases, id: \.self) { Text(Labels.param($0).fullName).tag($0) }
                 }
                 HStack {
                     Text("Amount").font(Theme.label)
@@ -562,7 +548,7 @@ struct AutomationPanel: View {
     var body: some View {
         List {
             Section {
-                Button(app.automation.isRecording ? "■ Stop recording take" : "● Record automation take") {
+                Button(app.automation.isRecording ? "■ Stop recording moves" : "● Record my moves") {
                     if app.automation.isRecording { _ = app.automation.stopRecording() }
                     else { app.automation.startRecording() }
                 }
@@ -574,7 +560,7 @@ struct AutomationPanel: View {
                     Button("■ Stop playback") { app.automation.stopPlayback() }
                 }
             }
-            Section("Takes") {
+            HintSection(key: .group(.automationTakes)) {
                 ForEach(app.automation.sessions) { s in
                     HStack {
                         VStack(alignment: .leading) {
@@ -616,36 +602,30 @@ struct TracePanel: View {
 
     var body: some View {
         List {
-            Section("Trace — geometry renderer") {
-                Toggle("3D mode", isOn: Binding(
-                    get: { app.params.bool(.trace3D) },
-                    set: { app.params.set(.trace3D, $0 ? 1 : 0, origin: .ui) }))
-                ParamRow(id: .traceMode, label: "Render",
+            HintSection(key: .group(.trace)) {
+                ParamToggle(id: .trace3D)
+                ParamRow(id: .traceMode,
                          steps: ["POINTS", "WIRE", "SOLID"])
-                ParamRow(id: .traceGrid, label: "Grid",
+                ParamRow(id: .traceGrid,
                          steps: kTraceGrids.map { "\($0)²" })
-                ParamRow(id: .tracePointSize, label: "Pt size")
-                ParamRow(id: .traceDepth, label: "Depth")
-                Toggle("Additive points (glow)", isOn: Binding(
-                    get: { app.params.bool(.traceAdditive) },
-                    set: { app.params.set(.traceAdditive, $0 ? 1 : 0, origin: .ui) }))
-                Toggle("Feedback trails", isOn: Binding(
-                    get: { app.params.bool(.traceTrails) },
-                    set: { app.params.set(.traceTrails, $0 ? 1 : 0, origin: .ui) }))
+                ParamRow(id: .tracePointSize)
+                ParamRow(id: .traceDepth)
+                ParamToggle(id: .traceAdditive)
+                ParamToggle(id: .traceTrails)
             }
-            Section("Camera") {
-                ParamRow(id: .traceAutoRotate, label: "Auto-rot")
-                ParamRow(id: .orbitDistance, label: "Distance")
-                ParamRow(id: .orbitElevation, label: "Elevation")
+            HintSection(key: .group(.cameraOrbit)) {
+                ParamRow(id: .traceAutoRotate)
+                ParamRow(id: .orbitDistance)
+                ParamRow(id: .orbitElevation)
                 Text("One finger orbits, two fingers zoom — on the canvas while 3D is on.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
-            Section("Mass — video on objects") {
-                ParamRow(id: .tracePrimitive, label: "Object",
+            HintSection(key: .group(.mass)) {
+                ParamRow(id: .tracePrimitive,
                          steps: TracePrimitive.names)
-                ParamRow(id: .traceSpinX, label: "Spin X")
-                ParamRow(id: .traceSpinY, label: "Spin Y")
-                ParamRow(id: .traceSpinZ, label: "Spin Z")
+                ParamRow(id: .traceSpinX)
+                ParamRow(id: .traceSpinY)
+                ParamRow(id: .traceSpinZ)
             }
         }
     }
@@ -659,7 +639,7 @@ struct OutputPanel: View {
 
     var body: some View {
         List {
-            Section("Recording") {
+            HintSection(key: .group(.recording)) {
                 Button(app.recorder?.isRecording == true ? "■ Stop" : "● Record") {
                     app.toggleRecord()
                 }
@@ -682,7 +662,7 @@ struct OutputPanel: View {
             }
             #endif
             ExportSettingsSection(settings: app.recordingSettings)
-            Section("MJPEG network stream") {
+            HintSection(key: .group(.mjpeg)) {
                 if let mjpeg = app.mjpeg {
                     Toggle("Serve MJPEG Stream", isOn: Binding(
                         get: { mjpeg.isRunning },
@@ -702,7 +682,7 @@ struct OutputPanel: View {
                         .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
                 }
             }
-            Section("NDI") {
+            HintSection(key: .group(.ndi)) {
                 if app.ndi?.isAvailable == true {
                     Button(app.ndi?.isSending == true ? "Stop NDI" : "Start NDI \"MoshPit\"") {
                         app.toggleNDI()
@@ -712,24 +692,21 @@ struct OutputPanel: View {
                         .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
                 }
             }
-            Section("Screen broadcast (ReplayKit)") {
+            HintSection(key: .group(.broadcast)) {
                 BroadcastPickerView().frame(height: Theme.buttonStandard)
-                Toggle("Clean feed (hide controls while broadcasting)", isOn: Binding(
-                    get: { app.params.bool(.cleanFeed) },
-                    set: {
-                        app.params.set(.cleanFeed, $0 ? 1 : 0, origin: .ui)
-                        app.performanceMode = $0
-                        if $0 { app.showHUD = false }
-                    }))
+                ParamToggle(id: .cleanFeed) { on in
+                    app.performanceMode = on
+                    if on { app.showHUD = false }
+                }
             }
-            Section("Processing resolution") {
-                PanelSlider(id: .processingRes, label: "Long edge",
+            HintSection(key: .param(.processingRes)) {
+                PanelSlider(id: .processingRes,
                             steps: kResolutions.map { "\($0)p" })
                 Text("Canvas long-edge resolution (default 540p). The canvas adopts the source's aspect ratio — sources are never stretched.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
-            Section("Output resolution") {
-                PanelSlider(id: .outputRes, label: "Max res", steps: kResolutions.map { "\($0)p" })
+            HintSection(key: .group(.outputResolution)) {
+                PanelSlider(id: .outputRes, steps: kResolutions.map { "\($0)p" })
                 Text("NDI runs at canvas resolution, capped by this. Recording uses it only when Export resolution is Match Canvas.")
                     .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
             }
@@ -746,7 +723,7 @@ private struct ProStatusSection: View {
     @ObservedObject var pro = ProManager.shared
 
     var body: some View {
-        Section("Save to Photos") {
+        Section("MoshPit Pro") {
             if pro.isPro {
                 Text("Unlocked ✓")
                     .font(Theme.label)
@@ -787,7 +764,7 @@ private struct ExportSettingsSection: View {
     @ObservedObject var settings: RecordingSettings
 
     var body: some View {
-        Section("Export — applies to next recording") {
+        HintSection(key: .group(.exportSettings)) {
             ForEach(RecordingSettings.Format.allCases) { format in
                 optionRow(title: format.rawValue,
                           selected: settings.format == format) {
@@ -879,14 +856,17 @@ struct PanelSlider: View {
     @EnvironmentObject var app: AppModel
     @EnvironmentObject var params: ParameterStore
     let id: ParameterID
-    let label: String
+    var label: String? = nil
     var steps: [String]? = nil
 
     var body: some View {
         HStack(spacing: Theme.g1) {
-            Text(label).font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
+            Text(label ?? Labels.param(id).title)
+                .font(Theme.labelSmall).foregroundStyle(Theme.textSecondary)
+                .lineLimit(1).minimumScaleFactor(0.8)
                 .frame(width: Theme.g6 + Theme.g3, alignment: .leading)
                 .onLongPressGesture { app.midi.learnTarget = id }
+            HintButton(key: .param(id))
             Slider(value: Binding(
                 get: { params.get(id) },
                 set: { params.set(id, steps != nil ? $0.rounded() : $0, origin: .ui) }),

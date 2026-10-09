@@ -35,10 +35,10 @@ enum MirrorMode: Int, CaseIterable {
     case none = 0, horizontal, vertical, quad
     var title: String {
         switch self {
-        case .none: return "None"
-        case .horizontal: return "Horiz"
-        case .vertical: return "Vert"
-        case .quad: return "Quad"
+        case .none: return "Off"
+        case .horizontal: return "Left-Right"
+        case .vertical: return "Up-Down"
+        case .quad: return "Four-way"
         }
     }
 }
@@ -47,10 +47,10 @@ enum ColorMode: Int, CaseIterable {
     case none = 0, invert, duotone, hueShift
     var title: String {
         switch self {
-        case .none: return "None"
+        case .none: return "Off"
         case .invert: return "Invert"
-        case .duotone: return "Duotone"
-        case .hueShift: return "Hue Shift"
+        case .duotone: return "Two-tone"
+        case .hueShift: return "Rainbow"
         }
     }
 }

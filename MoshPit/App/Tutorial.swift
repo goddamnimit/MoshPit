@@ -37,19 +37,19 @@ enum CoachScript {
               text: "Swipe from the left to switch between effects and open settings panels.",
               drawer: nil),
         .init(anchor: .modeList,
-              text: "These are your glitch styles. Smear stretches frames, Bloom erupts detail, T-Bloom fires on a rhythm — try them all.",
+              text: "These are your glitch styles. \(Labels.mode(.classicSmear).title) stretches frames, \(Labels.mode(.bloom).title) erupts detail, \(Labels.mode(.timedBloom).title) fires on a rhythm — try them all. Tap any ? to see what it does.",
               drawer: .left),
         .init(anchor: .panelTriggers,
-              text: "These panels give you sources (camera or video), effects, rhythm controls, automation, and output options.",
+              text: "These panels give you inputs (camera or video), effects, rhythm controls, recorded moves, and recording and streaming options.",
               drawer: .left),
         .init(anchor: .gridWarpToggle,
-              text: "The Effects panel also hides Grid-Mesh Glitch Warp — a drifting displacement mesh applied after everything else.",
+              text: "The Effects panel also hides \(Labels.param(.gridWarpEnabled).title) — a drifting mesh that warps the picture, applied after everything else.",
               drawer: nil, panel: .effects),
         .init(anchor: .spreadsheetToggle,
-              text: "Spreadsheet Mosh Filter quantizes your glitch into cells under generic ledger chrome, with an animated selection box.",
+              text: "\(Labels.param(.spreadsheetEnabled).title) turns your glitch into flat cells under fake spreadsheet menus, with a moving selection box.",
               drawer: nil, panel: .effects),
         .init(anchor: .trackingHUDToggle,
-              text: "Tracking HUD Overlay scatters real motion-tracking dots and coordinate readouts across the frame — pure VFX flavor.",
+              text: "\(Labels.param(.trackingHUDEnabled).title) scatters tracking dots and number readouts over moving areas — pure sci-fi decoration.",
               drawer: nil, panel: .effects),
         .init(anchor: .rightHandle,
               text: "Swipe from the right to tune the active effect with sliders and an XY pad.",
@@ -64,16 +64,16 @@ enum CoachScript {
               text: "Tap to snap back to a clean frame. Hold to peek at clean video without losing your glitch.",
               drawer: nil),
         .init(anchor: .recordButton,
-              text: "Tap to record your glitched video with mic audio. Tap again to save to Photos.",
+              text: "Tap to record your glitched video. Tap again to stop — it appears in My Clips. Free clips carry a small watermark; unlocking removes it and lets you save and share.",
               drawer: nil),
         .init(anchor: .bloomButton,
-              text: "Tap to manually trigger a bloom burst — moving areas erupt with duplicated detail.",
+              text: "Tap to trigger a \(Labels.mode(.bloom).title) — moving areas erupt with duplicated detail.",
               drawer: nil),
         .init(anchor: .hudPill,
-              text: "Your frame rate. Tap to expand for GPU timing details.",
+              text: "Your frame rate. Tap to expand for more performance details.",
               drawer: nil),
         .init(anchor: .finale,
-              text: "You're ready. Swipe the edges to explore — Clean mode is always one tap away if you want to start fresh. Have fun.",
+              text: "You're ready. Swipe the edges to explore — Clean is always one tap away if you want to start fresh. Tap any ? for a plain-English explanation. Have fun.",
               drawer: nil),
     ]
 }
@@ -342,7 +342,7 @@ struct DemoCard: Identifiable {
 
 enum DemoLibrary {
     /// Section display order for the sheet.
-    static let sections = ["Basics", "Mosh Modes", "Rhythm & Timing",
+    static let sections = ["Basics", "Glitch Styles", "Rhythm & Timing",
                            "Sources & Mixing", "Visual Effects", "3D", "Output"]
 
     static func demos(in section: String) -> [DemoCard] {
@@ -355,10 +355,10 @@ enum DemoLibrary {
     // MARK: Basics
 
     private static let basics: [DemoCard] = [
-        DemoCard(id: "clean", section: "Basics", title: "Clean Passthrough",
+        DemoCard(id: "clean", section: "Basics", title: "Clean (No Glitch)",
                  blurb: "Your baseline: pure camera, no effects.") { app in
             app.selectMode(.clean)
-            app.activeTip = "This is your baseline. No effects — pure camera. Hold the Reset button anytime to peek back here without losing your mosh."
+            app.activeTip = "This is your baseline. No effects — pure camera. Hold the Reset button anytime to peek back here without losing your glitch."
         },
         DemoCard(id: "firstsmear", section: "Basics", title: "Your First Smear",
                  blurb: "Watch frames stretch into trails.") { app in
@@ -366,58 +366,58 @@ enum DemoLibrary {
             app.openDrawer(.right)
             app.activeTip = "Move slowly in front of the camera. Watch the trail follow you. The longer you hold still, the more the last frame freezes into the canvas."
         },
-        DemoCard(id: "reset", section: "Basics", title: "Reset & Seed",
-                 blurb: "Manual I-frames: snap back to clean.") { app in
+        DemoCard(id: "reset", section: "Basics", title: "Reset to Clean",
+                 blurb: "Snap back to a clean frame.") { app in
             app.selectMode(.classicSmear)
-            app.activeTip = "Tap Reset to snap back to a clean frame — this seeds the canvas so your next mosh starts fresh. Hold Reset to peek without resetting."
+            app.activeTip = "Tap Reset to snap back to a clean frame so your next glitch starts fresh. Hold Reset to peek without resetting."
         },
         DemoCard(id: "saving", section: "Basics", title: "Saving Your Work",
-                 blurb: "Record video or snapshot a frame.") { app in
-            app.activeTip = "Tap the record button to capture video with mic audio. Tap the camera icon to snapshot a single frame. Both save to Photos."
+                 blurb: "Record video or snapshot a frame. Free clips are watermarked.") { app in
+            app.activeTip = "Tap the record button to capture video; tap the camera icon for a single frame. Both appear in My Clips with a small watermark until you unlock — unlocking removes it and lets you save and share."
         },
     ]
 
     // MARK: Mosh Modes
 
     private static let moshModes: [DemoCard] = [
-        DemoCard(id: "bloom", section: "Mosh Modes", title: "Bloom Burst",
+        DemoCard(id: "bloom", section: "Glitch Styles", title: "Burst",
                  blurb: "Moving areas erupt with frozen detail.") { app in
             app.selectMode(.bloom)
             app.openDrawer(.right)
             app.highlightParam = .bloomThreshold
-            app.activeTip = "Stay still, then move suddenly. Moving areas erupt with frozen detail. Lower Threshold = more sensitive."
+            app.activeTip = "Stay still, then move suddenly. Moving areas erupt with frozen detail. Lower Trigger = more sensitive."
         },
-        DemoCard(id: "tbloom", section: "Mosh Modes", title: "Timed Bloom",
-                 blurb: "Blooms fire on a timer, direction of their own.",) { app in
+        DemoCard(id: "tbloom", section: "Glitch Styles", title: "Pulse Burst",
+                 blurb: "Bursts fire on their own rhythm.",) { app in
             app.selectMode(.timedBloom)
             app.openDrawer(.right)
             app.highlightParam = .bloomRate
-            app.activeTip = "Blooms fire automatically on a timer. Rate controls how often. Try slow Rate with sudden movement between blooms."
+            app.activeTip = "Bursts fire automatically on a timer. Speed controls how often. Try a slow Speed with sudden movement between bursts."
         },
-        DemoCard(id: "drift", section: "Mosh Modes", title: "Directional Drift",
+        DemoCard(id: "drift", section: "Glitch Styles", title: "Push",
                  blurb: "Push the whole frame with the XY pad.",) { app in
             app.selectMode(.drift)
             app.openDrawer(.right)
             app.activeTip = "The XY pad controls the direction pixels smear. Push everything to one corner. Great for slow hypnotic flows."
         },
-        DemoCard(id: "mix", section: "Mosh Modes", title: "Mix Wet/Dry",
+        DemoCard(id: "mix", section: "Glitch Styles", title: "Blend",
                  blurb: "Blend fresh frames into the smear.",) { app in
             app.selectMode(.mixMosh)
             app.openDrawer(.right)
-            app.activeTip = "The crossfader blends fresh frames into the smear continuously. All the way left = frozen. All the way right = clean. Middle = the sweet spot."
+            app.activeTip = "Blend mixes fresh frames into the smear continuously. All the way left = frozen. All the way right = clean. Middle = the sweet spot."
         },
-        DemoCard(id: "cross", section: "Mosh Modes", title: "Cross Mosh",
+        DemoCard(id: "cross", section: "Glitch Styles", title: "Swap Motion",
                  blurb: "One source's motion drives the other's pixels.",) { app in
             app.selectMode(.crossMosh)
-            app.activeTip = "Load two different sources in slot A and B (Sources panel). Motion from one drives the pixels of the other. Flip the camera mid-mosh for instant cross-mosh between front and rear."
+            app.activeTip = "Load two different sources in slot A and B (Inputs panel). Motion from one drives the pixels of the other. Flip the camera mid-glitch for an instant swap between front and rear."
         },
-        DemoCard(id: "feedback", section: "Mosh Modes", title: "Feedback Loop",
+        DemoCard(id: "feedback", section: "Glitch Styles", title: "Tunnel",
                  blurb: "The canvas zooms and rotates into itself.",) { app in
             app.selectMode(.feedback)
             app.openDrawer(.right)
-            app.activeTip = "The canvas zooms and rotates into itself every frame. Small zoom values create infinite tunnels. Hue rotation makes it cycle through color."
+            app.activeTip = "The canvas zooms and rotates into itself every frame. Small zoom values create infinite tunnels. Color cycle makes it shift through the rainbow."
         },
-        DemoCard(id: "flip", section: "Mosh Modes", title: "Camera Flip Smear",
+        DemoCard(id: "flip", section: "Glitch Styles", title: "Camera Flip Smear",
                  blurb: "Flip cameras mid-smear for a face-melt cut.") { app in
             app.selectMode(.classicSmear)
             app.activeTip = "Tap the flip button mid-smear and watch your face melt into itself."
@@ -430,22 +430,22 @@ enum DemoLibrary {
         DemoCard(id: "taptempo", section: "Rhythm & Timing", title: "Tap Tempo",
                  blurb: "Lock MoshPit to your music.") { app in
             app.openSheet(.control)
-            app.activeTip = "Tap the TAP button repeatedly in time with music. MoshPit locks to your rhythm. Everything time-synced from here uses this BPM."
+            app.activeTip = "Tap the TAP button repeatedly in time with music. MoshPit locks to your rhythm. Everything time-synced from here uses this tempo."
         },
-        DemoCard(id: "lfo", section: "Rhythm & Timing", title: "LFO Basics",
+        DemoCard(id: "lfo", section: "Rhythm & Timing", title: "Rhythm Wave Basics",
                  blurb: "Make any parameter pulse automatically.",) { app in
             app.openSheet(.control)
-            app.activeTip = "LFO 1 is a wave that goes up and down at your tempo. Set its waveform and rate, then drag it to a destination in the mod matrix to make any parameter pulse automatically."
+            app.activeTip = "Rhythm wave 1 goes up and down in time with your tempo. Pick its shape and speed, then add a link in Links to make any control pulse automatically."
         },
         DemoCard(id: "rhythmwipe", section: "Rhythm & Timing", title: "Rhythmic Source Switching",
                  blurb: "Beat-synced cuts between A and B.",) { app in
             app.openSheet(.control)
-            app.activeTip = "Load two clips or use camera + clip. Route LFO 1 to Mix Crossfader with a square wave. Your sources now cut rhythmically on the beat."
+            app.activeTip = "Load two clips or use camera + clip. Link Rhythm wave 1 to A ↔ B with a square wave. Your sources now cut on the beat."
         },
         DemoCard(id: "strobe", section: "Rhythm & Timing", title: "Strobe Flash",
                  blurb: "Beat-gated blackout/whiteout flashes.",) { app in
             app.openSheet(.control)
-            app.activeTip = "Route an LFO to the Blackout destination in the strobe section. Square wave at 1/2 rate = flash on every other beat. Keep the flicker limiter ON unless you know your audience."
+            app.activeTip = "Set Flash beat to a rhythm wave. A square wave at 1/2 = a flash on every other beat. Keep Flash safety ON unless you know your audience."
         },
     ]
 
@@ -455,27 +455,27 @@ enum DemoLibrary {
         DemoCard(id: "loadvideo", section: "Sources & Mixing", title: "Load a Video",
                  blurb: "Any clip from Photos becomes a mosh source.") { app in
             app.openSheet(.sources)
-            app.activeTip = "Tap slot A to load a clip from your Photos library. It loops automatically and feeds the mosh engine just like the camera."
+            app.activeTip = "Tap Video under slot A to load a clip from your Photos library. It loops automatically and feeds the mosh engine just like the camera."
         },
         DemoCard(id: "reverse", section: "Sources & Mixing", title: "Reverse Playback",
                  blurb: "Play any clip backwards, mid-mosh.",) { app in
             app.openSheet(.sources)
-            app.activeTip = "Toggle Reverse on any video slot to play it backwards. Try it mid-mosh — the smear reverses direction as the motion vectors flip."
+            app.activeTip = "Toggle Reverse on any video slot to play it backwards. Try it mid-mosh — the smear reverses direction as the movement flips."
         },
         DemoCard(id: "selfcross", section: "Sources & Mixing", title: "Self Cross-Mosh",
                  blurb: "A clip smears itself with its own motion.",) { app in
             app.openSheet(.sources)
-            app.activeTip = "Load the same clip into both slot A and B, then select Cross mode. The video smears itself with its own motion. Desync the clips for stranger results."
+            app.activeTip = "Load the same clip into both slot A and B, then pick Swap Motion. The video smears itself with its own motion. Desync the clips for stranger results."
         },
         DemoCard(id: "lumawipe", section: "Sources & Mixing", title: "Luma Wipe",
                  blurb: "Brightness-keyed transitions between sources.",) { app in
             app.openSheet(.sources)
-            app.activeTip = "Set wipe mode to Luma in the Mix section. Drag the threshold — bright areas of the frame transition to source B first, dark areas last. Automate this with an LFO for rhythmic wipes."
+            app.activeTip = "Set Fade style to the brightness option in Blend Sources. Bright areas switch to source B first, dark areas last. Link a rhythm wave to A ↔ B for beat-synced wipes."
         },
         DemoCard(id: "videomod", section: "Sources & Mixing", title: "Video as Controller",
                  blurb: "A hidden clip drives your parameters.",) { app in
             app.openSheet(.control)
-            app.activeTip = "Load a clip into the MOD slot — it never appears on screen. Its brightness and motion control any parameter you route it to. A flickering fire clip in MOD = fire-driven bloom."
+            app.activeTip = "Load a clip into the MOD slot — it never appears on screen. Its brightness and movement control anything you link it to in Links. A flickering fire clip in MOD = fire-driven bursts."
         },
     ]
 
@@ -490,40 +490,40 @@ enum DemoLibrary {
         DemoCard(id: "invert", section: "Visual Effects", title: "Color Invert",
                  blurb: "Negative-space glitch explosions.",) { app in
             app.openSheet(.effects)
-            app.activeTip = "Invert flips all colors. Combined with Bloom it creates a negative-space explosion effect."
+            app.activeTip = "Invert flips all colors. Combined with Burst it creates a negative-space explosion effect."
         },
-        DemoCard(id: "duotone", section: "Visual Effects", title: "Duotone",
+        DemoCard(id: "duotone", section: "Visual Effects", title: "Two-tone",
                  blurb: "Two-color grade over any mosh.",) { app in
             app.openSheet(.effects)
-            app.activeTip = "Duotone maps your image to two colors — shadow hue and highlight hue. Route an LFO to Hue Shift instead for continuous color cycling."
+            app.activeTip = "Two-tone maps your image to two colors — one for darks, one for lights. Pick Rainbow instead and link a rhythm wave to Color spin for continuous color cycling."
         },
         DemoCard(id: "echo", section: "Visual Effects", title: "Echo Trails",
                  blurb: "Ghosts of past frames, keyed by brightness.") { app in
             app.openSheet(.effects)
             app.activeTip = "Echo layers past frames behind the current one, keyed by brightness. More layers = longer ghosting. Combined with Smear it creates deep time-based trails."
         },
-        DemoCard(id: "pixelsort", section: "Visual Effects", title: "Pixel Sort",
+        DemoCard(id: "pixelsort", section: "Visual Effects", title: "Pixel Streaks",
                  blurb: "Cascading streaks along brightness edges.") { app in
             app.openSheet(.effects)
-            app.activeTip = "PXLMSH sorts pixels along brightness edges. High threshold = subtle sorting along bright edges only. Low threshold = whole regions cascade."
+            app.activeTip = "Pixel Streaks sorts pixels along brightness edges. High Cutoff = subtle streaks along bright edges only. Low Cutoff = whole regions cascade."
         },
-        DemoCard(id: "gridwarp", section: "Visual Effects", title: "Grid-Mesh Glitch Warp",
+        DemoCard(id: "gridwarp", section: "Visual Effects", title: "Mesh Warp",
                  blurb: "A drifting mesh displaces every cell.") { app in
             app.params.set(.gridWarpEnabled, 1, origin: .ui)
             app.openSheet(.effects)
-            app.activeTip = "Grid-Mesh Glitch Warp displaces your frame through a procedural cell mesh. Route an LFO to Speed for a pulsing warp."
+            app.activeTip = "Mesh Warp pushes your frame through a drifting cell mesh. Link a rhythm wave to Drift speed for a pulsing warp."
         },
-        DemoCard(id: "spreadsheet", section: "Visual Effects", title: "Spreadsheet Mosh Filter",
+        DemoCard(id: "spreadsheet", section: "Visual Effects", title: "Spreadsheet Look",
                  blurb: "Your glitch, quantized into a ledger.") { app in
             app.params.set(.spreadsheetEnabled, 1, origin: .ui)
             app.openSheet(.effects)
-            app.activeTip = "Spreadsheet Mosh Filter averages each cell into a flat color under generic ledger chrome. Try the Reveal modes for a wipe-in."
+            app.activeTip = "Spreadsheet Look averages each cell into a flat color under fake spreadsheet menus. Try the Reveal options for a wipe-in."
         },
-        DemoCard(id: "trackinghud", section: "Visual Effects", title: "Tracking HUD Overlay",
+        DemoCard(id: "trackinghud", section: "Visual Effects", title: "Tracker Dots",
                  blurb: "Decorative motion-tracking dots and readouts.") { app in
             app.params.set(.trackingHUDEnabled, 1, origin: .ui)
             app.openSheet(.effects)
-            app.activeTip = "Tracking HUD Overlay scatters dots along real optical-flow motion with coordinate readouts — pure VFX-style decoration."
+            app.activeTip = "Tracker Dots scatters dots along real movement with number readouts — pure sci-fi decoration."
         },
     ]
 
@@ -535,24 +535,24 @@ enum DemoLibrary {
             app.params.set(.trace3D, 1, origin: .ui)
             app.params.set(.traceMode, 0, origin: .ui)   // points
             app.openSheet(.threeD)
-            app.activeTip = "Your moshed video becomes a cloud of glowing dots displaced by brightness. Drag to orbit, pinch to zoom."
+            app.activeTip = "Your glitched video becomes a cloud of glowing dots pushed out by brightness. Drag to orbit, pinch to zoom."
         },
         DemoCard(id: "wireframe", section: "3D", title: "Wireframe Face",
                  blurb: "Your video as a displaced grid mesh.",) { app in
             app.params.set(.trace3D, 1, origin: .ui)
             app.params.set(.traceMode, 1, origin: .ui)   // wireframe
             app.openSheet(.threeD)
-            app.activeTip = "The mesh shows the geometry of your video as a grid. Luma depth amount pushes bright areas toward you."
+            app.activeTip = "The mesh shows your video as a grid. Depth pushes bright areas toward you."
         },
         DemoCard(id: "object", section: "3D", title: "Textured Object",
                  blurb: "Wrap the mosh around a sphere or torus.",) { app in
             app.params.set(.trace3D, 1, origin: .ui)
             app.openSheet(.threeD)
-            app.activeTip = "Switch the primitive to Sphere or Torus — your moshed video wraps around it as a skin. Point cloud on a torus is particularly strange."
+            app.activeTip = "Set Shape to Sphere or Torus — your glitched video wraps around it like a skin. Dots on a torus are particularly strange."
         },
         DemoCard(id: "bloom3d", section: "3D", title: "3D + Bloom",
                  blurb: "Eruptions across the geometry surface.",) { app in
-            app.activeTip = "Switch to Bloom mode while in 3D point cloud. Bloom eruptions appear on the geometry surface. Add auto-rotate for a self-animating visual instrument."
+            app.activeTip = "Switch to Burst while in 3D dots. Bursts appear on the surface. Add Auto-spin for a self-animating visual instrument."
         },
     ]
 
@@ -561,16 +561,16 @@ enum DemoLibrary {
     private static let output: [DemoCard] = [
         DemoCard(id: "record", section: "Output", title: "Record a Performance",
                  blurb: "Full-resolution capture of everything.") { app in
-            app.activeTip = "Tap Record before you start. Tap again to stop and save. Recordings capture everything including mirror modes, color, and 3D geometry at full resolution."
+            app.activeTip = "Tap Record before you start. Tap again to stop; the clip appears in My Clips. Recordings capture everything including mirror, color and 3D. Free clips have a small watermark; unlocking removes it and enables saving and sharing."
         },
         DemoCard(id: "ndi", section: "Output", title: "NDI to Resolume",
                  blurb: "Stream live into your VJ setup.",) { app in
-            app.activeTip = "Toggle NDI in the Output panel. Accept the local network permission prompt. Open Resolume on the same Wi-Fi and look for MoshPit in the NDI sources. Your mosh streams live to your VJ setup."
+            app.activeTip = "Start NDI in Record & Stream. Accept the local network permission prompt. Open Resolume on the same Wi-Fi and look for MoshPit in the NDI sources. Your glitch streams live, clean, to your VJ setup."
         },
         DemoCard(id: "automation", section: "Output", title: "Automation",
                  blurb: "Record knob moves, replay them anywhere.",) { app in
             app.openSheet(.automation)
-            app.activeTip = "Hit Record in the Automation panel, perform your parameter changes, then stop. Play it back over any source — your performance is now a reusable loop."
+            app.activeTip = "Hit Record my moves in Record Moves, perform your slider changes, then stop. Play it back over any source — your performance is now a reusable loop."
         },
     ]
 }
@@ -681,17 +681,7 @@ struct HelpSheet: View {
     @EnvironmentObject var app: AppModel
     @Environment(\.dismiss) private var dismiss
 
-    private let keys: [(String, String)] = [
-        ("0", "Clean passthrough"), ("1–7", "Select mosh mode"),
-        ("Space", "Trigger bloom"), ("Hold Reset", "Peek clean (mosh kept)"),
-        ("W A S D / arrows", "Nudge drift"), ("R", "Reset canvas (I-frame)"),
-        ("⌘R", "Start/stop recording"), ("⇧R", "Reverse video playback"),
-        ("F", "Flip camera"),
-        ("H", "Hide/show controls"), ("T", "Tap tempo"),
-        ("M", "Cycle mirror mode"), ("C", "Cycle color mode"),
-        ("[", "Toggle modes drawer"), ("]", "Toggle parameters drawer"),
-        ("?", "Toggle this sheet"), ("Long-press a label", "MIDI learn"),
-    ]
+    private let keys = Labels.shortcuts
 
     var body: some View {
         NavigationStack {

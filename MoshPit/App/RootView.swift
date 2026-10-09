@@ -480,25 +480,25 @@ struct ModeParamList: View {
     @EnvironmentObject var params: ParameterStore
     var compact = false
 
-    private var rows: [(ParameterID, String, [String]?)] {
-        var r: [(ParameterID, String, [String]?)]
+    private var rows: [(ParameterID, [String]?)] {
+        var r: [(ParameterID, [String]?)]
         switch params.mode {
         case .clean:
             return []
         case .classicSmear, .drift, .crossMosh:
-            r = [(.motionGain, "Gain", nil), (.heal, "Heal", nil)]
+            r = [(.motionGain, nil), (.heal, nil)]
         case .bloom:
-            r = [(.bloomRate, "Rate", nil), (.bloomThreshold, "Thresh", nil)]
+            r = [(.bloomRate, nil), (.bloomThreshold, nil)]
         case .timedBloom:
-            r = [(.bloomRate, "Rate", nil), (.bloomAngle, "Angle", nil),
-                 (.bloomBias, "Bias", nil), (.bloomDecay, "Decay", nil)]
+            r = [(.bloomRate, nil), (.bloomAngle, nil),
+                 (.bloomBias, nil), (.bloomDecay, nil)]
         case .mixMosh:
-            r = [(.mixAmount, "Mix", nil), (.motionGain, "Gain", nil)]
+            r = [(.mixAmount, nil), (.motionGain, nil)]
         case .feedback:
-            r = [(.feedbackZoom, "Zoom", nil), (.feedbackRotate, "Rotate", nil),
-                 (.feedbackHue, "Hue", nil)]
+            r = [(.feedbackZoom, nil), (.feedbackRotate, nil),
+                 (.feedbackHue, nil)]
         }
-        r.append((.blockSize, "Block", kBlockSizes.map(String.init)))
+        r.append((.blockSize, kBlockSizes.map(String.init)))
         return r
     }
 
@@ -508,7 +508,7 @@ struct ModeParamList: View {
         perfBody(Perf.drawer, "ModeParamList.body", "rows \(rows.count)") {
             VStack(spacing: Theme.g1) {
                 ForEach(rows, id: \.0) { row in
-                    ParamRow(id: row.0, label: row.1, steps: row.2, compact: compact)
+                    ParamRow(id: row.0, steps: row.1, compact: compact)
                 }
             }
         }
@@ -548,16 +548,26 @@ private struct LeftDrawer: View {
     private var modeButtons: some View {
         VStack(spacing: Theme.g1) {
                 ForEach(MoshMode.displayOrder, id: \.rawValue) { mode in
-                    Button {
-                        Theme.haptic()
-                        app.selectMode(mode)
-                        onSelect()   // mode switch is quick: auto-close
-                    } label: {
-                        Text(mode.shortTitle).frame(maxWidth: .infinity)
+                    ZStack(alignment: .trailing) {
+                        Button {
+                            Theme.haptic()
+                            app.selectMode(mode)
+                            onSelect()   // mode switch is quick: auto-close
+                        } label: {
+                            VStack(spacing: 0) {
+                                Text(Labels.mode(mode).title)
+                                if let original = Labels.mode(mode).original {
+                                    Text(original).font(Theme.labelSmall)
+                                        .foregroundStyle(Theme.textSecondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(MoshButtonStyle(size: .standard,
+                                                     selected: app.params.mode == mode,
+                                                     fillsWidth: true))
+                        HintButton(key: .mode(mode))
                     }
-                    .buttonStyle(MoshButtonStyle(size: .standard,
-                                                 selected: app.params.mode == mode,
-                                                 fillsWidth: true))
                 }
         }
     }
@@ -565,14 +575,17 @@ private struct LeftDrawer: View {
     private var panelButtons: some View {
         VStack(spacing: Theme.g1) {
             ForEach(AppModel.Panel.allCases) { panel in
-                Button {
-                    app.openSheet(panel)   // closes this drawer first
-                    onSelect()
-                } label: {
-                    Label(panel.rawValue, systemImage: panel.icon)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                ZStack(alignment: .trailing) {
+                    Button {
+                        app.openSheet(panel)   // closes this drawer first
+                        onSelect()
+                    } label: {
+                        Label(Labels.panel(panel).title, systemImage: panel.icon)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(MoshButtonStyle(size: .standard, fillsWidth: true))
+                    HintButton(key: .panel(panel))
                 }
-                .buttonStyle(MoshButtonStyle(size: .standard, fillsWidth: true))
             }
         }
     }
@@ -710,7 +723,7 @@ private struct MainControlRow: View {
                     .frame(width: Theme.buttonStandard - Theme.g2)
             }
             .buttonStyle(MoshButtonStyle(size: .standard))
-            .accessibilityLabel("Bloom")
+            .accessibilityLabel(Labels.mode(.bloom).title)
             .coachAnchor(.bloomButton)
 
             // Camera-app style snapshot: saves the post-effect, post-mirror
@@ -860,7 +873,8 @@ struct ParamRow: View {
     // (params.objectWillChange), not the whole AppModel-observing tree.
     @EnvironmentObject var params: ParameterStore
     let id: ParameterID
-    let label: String
+    /// Display name override; nil = the Labels title (the normal case).
+    var label: String? = nil
     var steps: [String]? = nil
     var compact = false
 
@@ -901,7 +915,7 @@ struct ParamRow: View {
                         }
                     )
                 HStack(spacing: Theme.g1) {
-                    Text(label)
+                    Text(label ?? Labels.param(id).title)
                         .font(Theme.label)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -913,6 +927,7 @@ struct ParamRow: View {
                         Text("FINE")
                             .font(Theme.monoSmall).foregroundStyle(Theme.textSecondary)
                     }
+                    if !isDragging { HintButton(key: .param(id)) }
                     Spacer(minLength: Theme.gHalf)
                     Text(valueText)
                         .font(compact ? Theme.monoSmall : Theme.mono).monospacedDigit()
@@ -1042,15 +1057,7 @@ struct XYPad: View {
         .aspectRatio(1, contentMode: .fit)
     }
 
-    private var axisLabels: (x: String, y: String) {
-        switch params.mode {
-        case .bloom: return ("THRESH →", "RATE →")
-        case .timedBloom: return ("ANGLE / BIAS", "")
-        case .feedback: return ("OFFSET X →", "OFFSET Y →")
-        case .mixMosh: return ("MIX →", "GAIN →")
-        default: return ("DRIFT X →", "DRIFT Y →")
-        }
-    }
+    private var axisLabels: (x: String, y: String) { Labels.xyAxes(params.mode) }
 
     private func apply(_ x: Float, _ y: Float) {
         switch params.mode {
