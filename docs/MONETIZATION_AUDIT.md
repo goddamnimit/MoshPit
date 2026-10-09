@@ -44,6 +44,19 @@ Scope: the single paid feature, saving a recording directly to Photos
 - `ProManager` still carries the redeem-code plumbing, intentionally unreachable.
 
 ## Needs your action
-(App Store Connect checks are added in Phase 3.)
+**App Store Connect was NOT checked.** The Chrome session landed on the ASC login page
+(not signed in), and credentials are out of scope, so no live verification was done.
+Please verify manually:
+- [ ] IAP exists with Product ID exactly `com.moshpit.app.pro`, type Non-Consumable.
+- [ ] IAP status is Ready to Submit (not Missing Metadata); display name, description, and
+      USD 4.99 price set; review screenshot (the Unlock sheet) uploaded.
+- [ ] IAP is attached to the app version under "In-App Purchases" so it is reviewed with it.
+- [ ] Agreements, Tax, and Banking: Paid Apps agreement is Active (IAP cannot work otherwise).
+- [ ] App Privacy answers: Data Not Collected, no tracking (matches PrivacyInfo.xcprivacy).
+- [ ] Age rating, screenshots, description, keywords, support and privacy URLs are filled in.
+- [ ] Review notes: add how to test, e.g. "Record a clip and stop. The clip lands in the free
+      gallery and a sheet offers the one-time Unlock for saving directly to Photos. Share
+      and Save to Files are free. Use a sandbox Apple ID to test the purchase and Restore."
+      (docs/ReviewerNotes.md already has an IAP section to paste.)
 - On device: Xcode Run = bypass active (Save Video present, no sheet); Archive/TestFlight =
   paywall shows after stopping a recording.
