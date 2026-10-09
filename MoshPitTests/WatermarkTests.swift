@@ -1,5 +1,6 @@
 import XCTest
 import Metal
+import MetalKit
 @testable import MoshPit
 
 /// Free-tier watermark: placement math, the GPU pass (pixel-sampled against a
@@ -144,6 +145,61 @@ final class WatermarkTests: XCTestCase {
         app.debugSetPro(true)
         XCTAssertEqual(app.recorder?.watermarkLatched, true)
         app.recorder?.stop()
+        app.debugSetPro(nil)
+    }
+
+    // MARK: Live outputs stay clean (runtime)
+
+    /// Runtime check on the real frame fan-out: while a FREE recording is
+    /// watermarking into its own pixel buffer, the shared frame texture that
+    /// NDI / MJPEG consume must be unchanged. A probe consumer before the
+    /// recorder and one after it each blit the texture exactly like the NDI
+    /// sender does (plain blitScale); the two readbacks must be identical.
+    /// (NDI/MJPEG senders themselves need a network peer / the NDI SDK, so
+    /// this asserts the shared input they receive; the source-scan test
+    /// below pins that their own blit is the plain kernel.)
+    @MainActor
+    func testSharedFrameStaysCleanWhileFreeRecorderWatermarks() throws {
+        let app = AppModel()
+        let renderer = try XCTUnwrap(app.renderer, "Metal unavailable")
+        let ctx = try XCTUnwrap(app.ctx)
+        app.sources?.setTestPattern(slot: .a, inverted: false, portrait: false)
+        app.debugSetPro(false)
+
+        func probe(_ tex: MTLTexture) -> [UInt8]? {
+            let d = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .bgra8Unorm, width: tex.width, height: tex.height, mipmapped: false)
+            d.usage = [.shaderRead, .shaderWrite]
+            d.storageMode = .shared
+            guard let dst = ctx.device.makeTexture(descriptor: d),
+                  let cb = ctx.queue.makeCommandBuffer(),
+                  let enc = cb.makeComputeCommandEncoder() else { return nil }
+            enc.setTexture(tex, index: 0)
+            enc.setTexture(dst, index: 1)
+            ctx.dispatch(enc, "blitScale", width: dst.width, height: dst.height)   // NDI's blit
+            enc.endEncoding()
+            cb.commit()
+            cb.waitUntilCompleted()
+            var bytes = [UInt8](repeating: 0, count: dst.width * dst.height * 4)
+            dst.getBytes(&bytes, bytesPerRow: dst.width * 4,
+                         from: MTLRegionMake2D(0, 0, dst.width, dst.height), mipmapLevel: 0)
+            return bytes
+        }
+        var before: [UInt8]?
+        var after: [UInt8]?
+        renderer.frameConsumers.insert({ tex, _ in if before == nil { before = probe(tex) } }, at: 0)
+        renderer.frameConsumers.append({ tex, _ in if after == nil { after = probe(tex) } })
+
+        app.recorder?.start(width: 64, height: 64)
+        XCTAssertEqual(app.recorder?.watermarkLatched, true)
+        let view = MTKView(frame: CGRect(x: 0, y: 0, width: 320, height: 180), device: ctx.device)
+        view.drawableSize = CGSize(width: 320, height: 180)
+        renderer.draw(in: view)
+        app.recorder?.stop()
+
+        let b = try XCTUnwrap(before, "probe consumer before the recorder never ran")
+        let a = try XCTUnwrap(after, "probe consumer after the recorder never ran")
+        XCTAssertEqual(b, a, "recorder must not alter the frame other outputs receive")
         app.debugSetPro(nil)
     }
 

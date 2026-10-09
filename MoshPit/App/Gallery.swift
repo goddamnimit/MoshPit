@@ -20,7 +20,7 @@ struct GalleryPanel: View {
             if app.exportLocked, !app.galleryHintDismissed {
                 Section {
                     HStack(alignment: .top, spacing: Theme.g1) {
-                        Text("Clips here have a watermark and can't be exported until you unlock. Viewing, playing, remixing and deleting stay free.")
+                        Text("Clips and snapshots here have a watermark and can't be exported until you unlock. Viewing, playing, remixing and deleting stay free.")
                             .font(Theme.labelSmall)
                             .foregroundStyle(Theme.textSecondary)
                         Spacer(minLength: 0)
@@ -35,7 +35,7 @@ struct GalleryPanel: View {
             }
             if app.sessionClips.isEmpty {
                 Section {
-                    Text("Recordings from this session appear here.")
+                    Text("Nothing here yet. Tap the red button to record, or the camera button for a snapshot — they appear here.")
                         .font(Theme.label)
                         .foregroundStyle(Theme.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -122,7 +122,9 @@ private struct ClipRow: View {
                                                   style: .continuous)
                             .stroke(Theme.stroke, lineWidth: 1))
                     VStack(alignment: .leading, spacing: Theme.gHalf) {
-                        Text("\(SessionClipStore.durationText(clip.duration)) · \(SessionClipStore.fileSizeText(clip.fileSize))")
+                        Text(clip.kind == .image
+                             ? "Snapshot · \(SessionClipStore.fileSizeText(clip.fileSize))"
+                             : "\(SessionClipStore.durationText(clip.duration)) · \(SessionClipStore.fileSizeText(clip.fileSize))")
                             .font(Theme.mono).monospacedDigit()
                             .foregroundStyle(Theme.textPrimary)
                         Text(Self.relative.localizedString(for: clip.timestamp,
@@ -139,11 +141,13 @@ private struct ClipRow: View {
                 Button {
                     app.shareFile(clip.url)
                 } label: { Label("Share", systemImage: "square.and.arrow.up") }
-                Button {
-                    app.loadClipIntoSlotA(clip)
-                } label: { Label("Load into Slot A", systemImage: "arrow.uturn.left.circle") }
-                Button(action: onSocialExport) {
-                    Label("Share to Social", systemImage: "arrow.up.forward.app")
+                if clip.kind == .video {
+                    Button {
+                        app.loadClipIntoSlotA(clip)
+                    } label: { Label("Use as Input A", systemImage: "arrow.uturn.left.circle") }
+                    Button(action: onSocialExport) {
+                        Label("Share to Social", systemImage: "arrow.up.forward.app")
+                    }
                 }
                 Button(role: .destructive, action: onDelete) {
                     Label("Delete", systemImage: "trash")
@@ -210,8 +214,15 @@ struct ClipPlaybackView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            PlayerLayerView(player: playback.player)
-                .ignoresSafeArea()
+            if clip.kind == .image {
+                Image(uiImage: UIImage(contentsOfFile: clip.url.path) ?? clip.thumbnail)
+                    .resizable().aspectRatio(contentMode: .fit)
+                    .ignoresSafeArea()
+                    .accessibilityLabel("Snapshot")
+            } else {
+                PlayerLayerView(player: playback.player)
+                    .ignoresSafeArea()
+            }
 
             VStack {
                 HStack {
@@ -222,9 +233,11 @@ struct ClipPlaybackView: View {
                 .padding(.horizontal, Theme.g2)
                 .padding(.top, Theme.g1)
                 Spacer()
-                controls
-                    .padding(.horizontal, Theme.g2)
-                    .padding(.bottom, Theme.g3)
+                if clip.kind == .video {
+                    controls
+                        .padding(.horizontal, Theme.g2)
+                        .padding(.bottom, Theme.g3)
+                }
             }
         }
         .preferredColorScheme(.dark)

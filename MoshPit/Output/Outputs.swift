@@ -70,6 +70,10 @@ final class MoshRecorder: NSObject, ObservableObject,
     private var audioSession: AVCaptureSession?
     private let audioQueue = DispatchQueue(label: "moshpit.rec.audio")
     private var texCache: CVMetalTextureCache?
+    /// Serializes "still recording?" + append against stop()'s markAsFinished:
+    /// appending to a finished writer input raises an NSException, and the
+    /// frame/audio completion handlers run on other threads than stop().
+    private let appendLock = NSLock()
 
     init(ctx: MetalContext) {
         self.ctx = ctx
@@ -158,6 +162,7 @@ final class MoshRecorder: NSObject, ObservableObject,
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
+        appendLock.lock(); defer { appendLock.unlock() }
         guard isRecording, startTime != nil,
               let audioInput, audioInput.isReadyForMoreMediaData else { return }
         audioInput.append(sampleBuffer)
@@ -191,7 +196,9 @@ final class MoshRecorder: NSObject, ObservableObject,
             enc.endEncoding()
         }
         cb.addCompletedHandler { [weak self] _ in
-            guard let self, self.isRecording else { return }
+            guard let self else { return }
+            self.appendLock.lock(); defer { self.appendLock.unlock() }
+            guard self.isRecording else { return }
             _ = adaptor.append(pixelBuffer, withPresentationTime: time)
         }
         cb.commit()
@@ -199,11 +206,13 @@ final class MoshRecorder: NSObject, ObservableObject,
 
     func stop() {
         guard isRecording, let writer else { return }
+        appendLock.lock()
         isRecording = false
-        audioSession?.stopRunning()
-        audioSession = nil
         videoInput?.markAsFinished()
         audioInput?.markAsFinished()
+        appendLock.unlock()
+        audioSession?.stopRunning()
+        audioSession = nil
         let url = writer.outputURL
         // Entitlement checked ONCE here (main thread) and latched — a
         // purchase completing mid-finalize doesn't change this artifact's

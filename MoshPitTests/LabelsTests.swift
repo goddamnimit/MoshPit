@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import MoshPit
 
 /// Labels + hints coverage: every registered parameter, mode, panel and hint
@@ -85,5 +86,38 @@ final class LabelsTests: XCTestCase {
         let joined = CoachScript.stops.map(\.text).joined(separator: " ")
         XCTAssertTrue(joined.contains(Labels.mode(.classicSmear).title))
         XCTAssertTrue(joined.contains("watermark"))
+    }
+}
+
+/// Layout guard for the coach-mark anchors: adding "?" and two-line labels
+/// must not change the height of the rows/buttons the anchors wrap.
+@MainActor
+final class HintLayoutTests: XCTestCase {
+    private func height<V: View>(of view: V, width: CGFloat) -> CGFloat {
+        let host = UIHostingController(rootView: view)
+        return host.sizeThatFits(in: CGSize(width: width, height: 2000)).height
+    }
+
+    func testParamRowKeepsStandardHeightWithHintButton() {
+        let app = AppModel()
+        for id in [ParameterID.motionGain, .bloomThreshold, .feedbackHue, .blockSize] {
+            XCTAssertFalse(Labels.param(id).hint.isEmpty)
+            let h = height(of: ParamRow(id: id, compact: true)
+                .environmentObject(app).environmentObject(app.params), width: 240)
+            XCTAssertEqual(h, Theme.buttonStandard, accuracy: 0.5, "\(id.rawValue) row height")
+        }
+    }
+
+    func testModeButtonWithOriginalNameStaysStandardHeight() {
+        for mode in MoshMode.displayOrder {
+            let label = VStack(spacing: 0) {
+                Text(Labels.mode(mode).title)
+                if let o = Labels.mode(mode).original { Text(o).font(Theme.labelSmall) }
+            }
+            .frame(maxWidth: .infinity)
+            let h = height(of: Button(action: {}) { label }
+                .buttonStyle(MoshButtonStyle(size: .standard, fillsWidth: true)), width: 200)
+            XCTAssertEqual(h, Theme.buttonStandard, accuracy: 0.5, "\(mode) button height")
+        }
     }
 }

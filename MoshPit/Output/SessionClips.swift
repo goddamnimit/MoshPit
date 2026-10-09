@@ -7,12 +7,16 @@ import AVFoundation
 /// directory, nothing persists, and no Photos-library browsing (no new
 /// permissions) is involved.
 struct SessionClip: Identifiable, Equatable {
+    enum Kind { case video, image }
     let id: UUID
     let url: URL
     let thumbnail: UIImage
     let duration: TimeInterval
     let fileSize: Int64
     let timestamp: Date
+    /// `.image` = a free-tier (watermarked) snapshot; same session-only
+    /// lifecycle as recordings. Defaulted so video call sites are unchanged.
+    var kind: Kind = .video
 
     static func == (lhs: SessionClip, rhs: SessionClip) -> Bool { lhs.id == rhs.id }
 }
@@ -83,6 +87,22 @@ enum SessionClipStore {
                            duration: seconds.isFinite ? seconds : 0,
                            fileSize: size,
                            timestamp: timestamp)
+    }
+
+    /// Gallery entry for a (watermarked) snapshot PNG already written to `url`.
+    static func makeImageClip(url: URL, image: UIImage, timestamp: Date = Date()) -> SessionClip {
+        let maxSide: CGFloat = 480
+        let scale = min(1, maxSide / max(image.size.width, image.size.height))
+        let size = CGSize(width: max(1, image.size.width * scale),
+                          height: max(1, image.size.height * scale))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let thumb = UIGraphicsImageRenderer(size: size, format: format)
+            .image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let bytes = (attributes?[.size] as? Int64) ?? 0
+        return SessionClip(id: UUID(), url: url, thumbnail: thumb, duration: 0,
+                           fileSize: bytes, timestamp: timestamp, kind: .image)
     }
 
     /// "m:ss" duration text for gallery rows.

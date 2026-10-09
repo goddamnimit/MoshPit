@@ -138,6 +138,13 @@ final class StoreTests: XCTestCase {
         XCTAssertTrue(app.shareToast?.message.contains("watermark") == true,
                       "free snapshot is flagged as watermarked")
         XCTAssertFalse(savedToPhotos, "free snapshot never reaches Photos")
+        await waitUntil { !app.sessionClips.isEmpty }
+        XCTAssertEqual(app.sessionClips.last?.kind, .image,
+                       "free snapshot lands in the session gallery")
+        XCTAssertTrue(app.shareToast?.message.contains("My Clips") == true)
+        if let url = app.sessionClips.last?.url {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        }
         app.dismissShareToast()
 
         app.debugSetPro(true)

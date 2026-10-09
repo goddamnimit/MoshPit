@@ -90,7 +90,7 @@ enum Labels {
         case .output:
             return e("Record & Stream", "Output", "Start a recording, choose video quality, and send your glitch live to other screens over Wi-Fi.")
         case .gallery:
-            return e("My Clips", "Gallery", "Recordings from this session. Watch them, load one back in as a source, or delete it. Exporting needs the one-time unlock.")
+            return e("My Clips", "Gallery", "Recordings and snapshots from this session. Watch them, load one back in as a source, or delete it. Exporting needs the one-time unlock.")
         }
     }
 

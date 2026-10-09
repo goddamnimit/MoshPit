@@ -574,10 +574,13 @@ final class AppModel: ObservableObject {
                 let pngURL = SessionClipStore.snapshotURL()
                 let wrote = (try? image.pngData()?.write(to: pngURL)) != nil
                 if watermark {
-                    // Free tier: watermarked, never written to Photos. Share
-                    // on the toast routes to the unlock sheet.
+                    // Free tier: watermarked, never written to Photos. It
+                    // lands in the session gallery (view / delete are free);
+                    // Share on the toast routes to the unlock sheet.
+                    let clip = wrote ? SessionClipStore.makeImageClip(url: pngURL, image: image) : nil
                     DispatchQueue.main.async {
-                        self?.showShareToast("Snapshot has a watermark — unlock to save",
+                        if let clip { self?.sessionClips.append(clip) }
+                        self?.showShareToast("Snapshot saved to My Clips with a watermark — unlock to export",
                                              shareURL: wrote ? pngURL : nil)
                     }
                     return
