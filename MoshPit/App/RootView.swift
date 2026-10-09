@@ -159,6 +159,11 @@ struct RootView: View {
                 .presentationBackground(.ultraThinMaterial)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
+        .sheet(isPresented: $app.showWelcome, onDismiss: { app.welcomeDismissed() }) {
+            WelcomeView()
+                .presentationDetents([.large])
+                .presentationBackground(.ultraThinMaterial)
+        }
         .sheet(isPresented: $app.showUpgradeSheet) {
             UpgradeSheet()
                 .presentationDetents([.large])
@@ -188,7 +193,13 @@ struct RootView: View {
         }
         .onAppear {
             applyDebugLaunchArguments()
-            if !UserDefaults.standard.bool(forKey: CoachScript.hasSeenKey) {
+            if !UserDefaults.standard.bool(forKey: AppModel.hasSeenWelcomeKey) {
+                // First launch: welcome first; it starts the coach marks when
+                // dismissed (never underneath it).
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    if app.coachIndex == nil { app.presentWelcome() }
+                }
+            } else if !UserDefaults.standard.bool(forKey: CoachScript.hasSeenKey) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     if app.coachIndex == nil { app.startTutorial() }
                 }
@@ -324,6 +335,7 @@ struct RootView: View {
             // Any debug-hook launch marks the tutorial as seen (deterministic
             // screenshots) — unless explicitly requesting a coach stop.
             UserDefaults.standard.set(true, forKey: CoachScript.hasSeenKey)
+            UserDefaults.standard.set(true, forKey: AppModel.hasSeenWelcomeKey)
         }
         if let i = args.firstIndex(of: "-coach"), i + 1 < args.count,
            let n = Int(args[i + 1]), n < CoachScript.stops.count {

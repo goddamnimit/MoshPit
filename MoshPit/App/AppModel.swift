@@ -67,6 +67,9 @@ final class AppModel: ObservableObject {
     /// presentUpgrade(for:), which respects the overlay mutual-exclusivity
     /// system.
     @Published var showUpgradeSheet = false
+    /// First-launch welcome cards. Present ONLY via presentWelcome().
+    @Published var showWelcome = false
+    static let hasSeenWelcomeKey = "moshpit.hasSeenWelcome"
     /// The capability whose gate the user hit (there is exactly one today).
     private(set) var upgradeCapability: Capability?
     /// Completes the originally-blocked action when isPro flips true while
@@ -350,6 +353,37 @@ final class AppModel: ObservableObject {
         if showUpgradeSheet { showUpgradeSheet = false }
         pendingProAction?()
         pendingProAction = nil
+    }
+
+    /// Welcome cards through the same overlay-exclusivity rules as
+    /// openSheet(): drawers and sheets animate away first, and the coach
+    /// overlay is never started underneath it.
+    func presentWelcome() {
+        guard !showWelcome else { return }
+        showCheatSheet = false
+        showDemoSheet = false
+        let wait = openDrawer != nil || activePanel != nil
+        openDrawer = nil
+        activePanel = nil
+        if wait {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.overlaySwap) {
+                [weak self] in self?.showWelcome = true
+            }
+        } else {
+            showWelcome = true
+        }
+    }
+
+    /// Runs on every dismissal route (Skip, Get started, swipe-down). Persists
+    /// "seen" and hands off to the coach marks if they haven't been seen.
+    func welcomeDismissed(defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: Self.hasSeenWelcomeKey)
+        showWelcome = false
+        guard !defaults.bool(forKey: CoachScript.hasSeenKey) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, self.coachIndex == nil, !self.showWelcome else { return }
+            self.startTutorial()
+        }
     }
 
     /// Present the upgrade sheet through the same overlay-exclusivity rules

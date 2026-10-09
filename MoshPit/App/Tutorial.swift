@@ -698,6 +698,13 @@ struct HelpSheet: View {
                     }
                 }
                 Section("Tutorial") {
+                    Button("Replay welcome") {
+                        dismiss()
+                        app.showCheatSheet = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            app.presentWelcome()
+                        }
+                    }
                     Button("Restart tutorial") {
                         dismiss()
                         app.showCheatSheet = false
