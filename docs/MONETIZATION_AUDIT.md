@@ -44,19 +44,38 @@ Scope: the single paid feature, saving a recording directly to Photos
 - `ProManager` still carries the redeem-code plumbing, intentionally unreachable.
 
 ## Needs your action
-**App Store Connect was NOT checked.** The Chrome session landed on the ASC login page
-(not signed in), and credentials are out of scope, so no live verification was done.
-Please verify manually:
-- [ ] IAP exists with Product ID exactly `com.moshpit.app.pro`, type Non-Consumable.
-- [ ] IAP status is Ready to Submit (not Missing Metadata); display name, description, and
-      USD 4.99 price set; review screenshot (the Unlock sheet) uploaded.
-- [ ] IAP is attached to the app version under "In-App Purchases" so it is reviewed with it.
-- [ ] Agreements, Tax, and Banking: Paid Apps agreement is Active (IAP cannot work otherwise).
-- [ ] App Privacy answers: Data Not Collected, no tracking (matches PrivacyInfo.xcprivacy).
-- [ ] Age rating, screenshots, description, keywords, support and privacy URLs are filled in.
-- [ ] Review notes: add how to test, e.g. "Record a clip and stop. The clip lands in the free
-      gallery and a sheet offers the one-time Unlock for saving directly to Photos. Share
-      and Save to Files are free. Use a sandbox Apple ID to test the purchase and Restore."
-      (docs/ReviewerNotes.md already has an IAP section to paste.)
-- On device: Xcode Run = bypass active (Save Video present, no sheet); Archive/TestFlight =
-  paywall shows after stopping a recording.
+## App Store Connect (read-only check, 2026-10-08, signed in by you)
+Nothing was edited, submitted, or changed.
+
+**Findings**
+- App "MoshPit — Datamosh" iOS 1.0 (build 18) is **Rejected**: submitted Jul 9, Apple reply
+  Jul 22 under **Guideline 2.1(b) App Completeness**: the app references unlocking but the
+  In-App Purchase was never submitted for review. Apple asks you to submit the IAP and upload a
+  new binary, and notes an App Review screenshot is required for the IAP.
+- IAP `MoshPit Pro`, Product ID `com.moshpit.app.pro` matches the code exactly. Type
+  Non-Consumable. Status **Prepare for Submission** (draft, never submitted). Localization
+  en-US: "MoshPit Pro" / "Save your recorded videos to Photos." USD base price set (175
+  regions). Family Sharing is off, matching the .storekit file. Reference name is "53".
+- **The IAP's Review Information screenshot is empty.** This is what blocks "Add for Review".
+- **Paid Apps Agreement is "Pending User Info"; no bank account and no tax form** on file.
+  Until these are complete, IAP purchases cannot work in production and the IAP cannot go
+  live. (Free Apps Agreement is Active.)
+
+**Needs your action (in this order)**
+- [ ] Business > complete the Paid Apps Agreement: add Bank Account and Tax Form(s).
+- [ ] On the IAP page: upload the review screenshot (the in-app Unlock sheet, e.g. from the
+      Simulator on a 6.5"/6.9" iPhone size), and optionally rename the Reference Name from "53".
+- [ ] Add review notes to the IAP (see suggested text below).
+- [ ] Upload a **new build** (this fixed 18 per Apple), then on the new version page add the IAP
+      under "In-App Purchases", and resubmit. A first IAP must go with a new app version.
+- [ ] Reply to Apple's message if you want to explain; not required.
+- Suggested review note: "Record a clip and stop. The clip lands in the free gallery and a
+  sheet offers a one-time Unlock for saving directly to Photos. Sharing and Save to Files are
+  free. Test with a sandbox Apple ID; Restore Purchases is on the same sheet."
+
+**Not checked** (ran out of scope this pass; verify in ASC): App Privacy answers vs.
+PrivacyInfo.xcprivacy (should be Data Not Collected / no tracking), age rating, screenshots,
+description, keywords, support/privacy URLs, review notes on the app version.
+
+**Still on device**
+- [ ] On device: Xcode Run = bypass active (Save Video, no sheet); Archive/TestFlight = paywall.
